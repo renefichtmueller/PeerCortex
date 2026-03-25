@@ -201,6 +201,15 @@ a{color:var(--blue);text-decoration:none;transition:color .2s}a:hover{color:var(
     <div id="rpkiContent"></div>
   </div>
 
+  <!-- Atlas Probes -->
+  <div class="card full" id="atlasCard">
+    <div class="card-title">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg>
+      RIPE Atlas Probes
+    </div>
+    <div id="atlasContent"></div>
+  </div>
+
   <!-- ASPA Intelligence (NEW) -->
   <div class="card full" id="aspaCard">
     <div class="card-title">
@@ -269,6 +278,7 @@ a{color:var(--blue);text-decoration:none;transition:color .2s}a:hover{color:var(
   <div class="card full"><div class="card-title">Network Overview</div><div class="skeleton h2"></div><div class="skeleton h3"></div><div class="skeleton wide"></div><div class="skeleton med"></div></div>
   <div class="card"><div class="card-title">Announced Prefixes</div><div class="skeleton h2"></div><div class="skeleton wide"></div><div class="skeleton med"></div></div>
   <div class="card"><div class="card-title">RPKI Compliance</div><div class="skeleton h2"></div><div class="skeleton wide"></div></div>
+  <div class="card full"><div class="card-title">RIPE Atlas Probes</div><div class="skeleton wide"></div><div class="skeleton med"></div></div>
   <div class="card full"><div class="card-title">ASPA Status</div><div class="skeleton wide"></div><div class="skeleton med"></div></div>
   <div class="card full"><div class="card-title">bgproutes.io</div><div class="skeleton wide"></div><div class="skeleton med"></div></div>
   <div class="card full"><div class="card-title">AS Neighbours</div><div class="skeleton wide"></div><div class="skeleton wide"></div><div class="skeleton med"></div></div>
@@ -604,6 +614,9 @@ function renderDashboard(d) {
   }
   $('rpkiContent').innerHTML = rk;
 
+  // Atlas Probes
+  renderAtlas(d.atlas);
+
   // Neighbours
   let ne = '<div class="stat-row">';
   ne += '<div class="stat"><div class="stat-val">' + nb.total + '</div><div class="stat-label">Total</div></div>';
@@ -663,6 +676,54 @@ function renderDashboard(d) {
     fh += '</tbody></table></div>';
   }
   $('facContent').innerHTML = fh;
+}
+
+
+function renderAtlas(atlas) {
+  if (!atlas) {
+    $('atlasContent').innerHTML = '<div style="font-size:.85rem;color:var(--muted)">No RIPE Atlas data available.</div>';
+    return;
+  }
+
+  var h = '';
+
+  // Summary badges
+  h += '<div class="stat-row">';
+  h += '<div class="stat"><div class="stat-val blue">' + atlas.total_probes + '</div><div class="stat-label">Total Probes</div></div>';
+  h += '<div class="stat"><div class="stat-val green">' + atlas.connected + '</div><div class="stat-label">Connected</div></div>';
+  h += '<div class="stat"><div class="stat-val red">' + atlas.disconnected + '</div><div class="stat-label">Disconnected</div></div>';
+  h += '<div class="stat"><div class="stat-val orange">' + atlas.anchors + '</div><div class="stat-label">Anchors</div></div>';
+  h += '</div>';
+
+  if (atlas.total_probes > 0) {
+    // Connection ratio bar
+    var connPct = pct(atlas.connected, atlas.total_probes);
+    h += '<div style="font-size:.7rem;color:var(--muted)">Connected ' + connPct + '% / Disconnected ' + (100 - connPct) + '%</div>';
+    h += '<div class="progress-multi"><div style="width:' + connPct + '%;background:var(--green)"></div><div style="width:' + (100 - connPct) + '%;background:var(--red)"></div></div>';
+  }
+
+  if (atlas.probes && atlas.probes.length > 0) {
+    h += '<div class="expand-toggle" onclick="toggleExpand(this)">Show probe details (' + atlas.probes.length + (atlas.total_probes > atlas.probes.length ? ' of ' + atlas.total_probes : '') + ')</div>';
+    h += '<div class="expand-body"><div class="scroll-wrap"><table class="tbl"><thead><tr><th>ID</th><th>Status</th><th>Anchor</th><th>Country</th><th>Prefix</th><th>Description</th></tr></thead><tbody>';
+    atlas.probes.forEach(function(p) {
+      var statusClass = p.status === 'Connected' ? 'badge-green' : 'badge-red';
+      var anchorBadge = p.is_anchor ? '<span class="badge badge-orange">Anchor</span>' : '-';
+      var prefix = p.prefix_v4 || p.prefix_v6 || '-';
+      h += '<tr>';
+      h += '<td><a href="https://atlas.ripe.net/probes/' + p.id + '/" target="_blank" style="color:var(--blue)">' + p.id + '</a></td>';
+      h += '<td><span class="badge ' + statusClass + '">' + escHtml(p.status) + '</span></td>';
+      h += '<td>' + anchorBadge + '</td>';
+      h += '<td>' + countryFlag(p.country) + ' ' + escHtml(p.country) + '</td>';
+      h += '<td style="font-family:monospace;font-size:.75rem">' + escHtml(prefix) + '</td>';
+      h += '<td style="font-size:.75rem">' + escHtml(p.description) + '</td>';
+      h += '</tr>';
+    });
+    h += '</tbody></table></div></div>';
+  } else if (atlas.total_probes === 0) {
+    h += '<div style="margin-top:.75rem;font-size:.85rem;color:var(--muted)">No RIPE Atlas probes found for this network. <a href="https://atlas.ripe.net/get-involved/become-a-host/" target="_blank" style="color:var(--blue)">Host a probe?</a></div>';
+  }
+
+  $('atlasContent').innerHTML = h;
 }
 
 async function doCompare() {

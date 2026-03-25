@@ -383,12 +383,13 @@ const server = http.createServer(async (req, res) => {
     const start = Date.now();
 
     try {
-      const [pdbNet, prefixData, neighbourData, overviewData, rirData] = await Promise.all([
+      const [pdbNet, prefixData, neighbourData, overviewData, rirData, atlasProbeData] = await Promise.all([
         fetchJSON("https://www.peeringdb.com/api/net?asn=" + asn),
         fetchJSON("https://stat.ripe.net/data/announced-prefixes/data.json?resource=AS" + asn),
         fetchJSON("https://stat.ripe.net/data/asn-neighbours/data.json?resource=AS" + asn),
         fetchJSON("https://stat.ripe.net/data/as-overview/data.json?resource=AS" + asn),
         fetchJSON("https://stat.ripe.net/data/rir-stats-country/data.json?resource=AS" + asn),
+        fetchJSON("https://atlas.ripe.net/api/v2/probes/?asn_v4=" + asn + "&page_size=500"),
       ]);
 
       const net = pdbNet?.data?.[0] || {};
@@ -397,6 +398,11 @@ const server = http.createServer(async (req, res) => {
       const neighbours = neighbourData?.data?.neighbours || [];
       const overview = overviewData?.data || {};
       const rirEntries = rirData?.data?.located_resources || rirData?.data?.rir_stats || [];
+
+      // Atlas probes
+      const atlasProbes = atlasProbeData?.results || [];
+      const atlasConnected = atlasProbes.filter(p => p.status_name === "Connected");
+      const atlasAnchors = atlasProbes.filter(p => p.is_anchor === true);
 
       // Phase 2: IX + Facilities + RPKI (batched 20 at a time)
       const phase2Promises = [];
@@ -530,6 +536,21 @@ const server = http.createServer(async (req, res) => {
         facilities: {
           total: facilities.length,
           list: facilities,
+        },
+        atlas: {
+          total_probes: atlasProbes.length,
+          connected: atlasConnected.length,
+          disconnected: atlasProbes.length - atlasConnected.length,
+          anchors: atlasAnchors.length,
+          probes: atlasProbes.slice(0, 100).map(p => ({
+            id: p.id,
+            status: p.status_name || p.status || "Unknown",
+            is_anchor: p.is_anchor || false,
+            country: p.country_code || "",
+            prefix_v4: p.prefix_v4 || "",
+            prefix_v6: p.prefix_v6 || "",
+            description: p.description || "",
+          })),
         },
       };
 
