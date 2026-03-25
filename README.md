@@ -23,9 +23,8 @@
 
 ---
 
-<!-- Demo animation placeholder -->
 <p align="center">
-  <em>Demo animation coming soon — see <a href="#claude-code-integration">Claude Code Integration</a> for example conversations.</em>
+  <img src="docs/assets/demo.svg" alt="PeerCortex Demo" width="800" />
 </p>
 
 ---
