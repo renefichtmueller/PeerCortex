@@ -182,7 +182,7 @@ const server = http.createServer(async (req, res) => {
 
       const detectedProviders = [...upstreamSet].map((asn) => {
         const nb = leftNeighbours.find((n) => n.asn === asn);
-        return { asn, name: nb ? nb.as_name || "AS" + asn : "AS" + asn };
+        return { asn, name: nb && nb.as_name ? nb.as_name : "" };
       });
 
       // Check RIPE DB for ASPA references

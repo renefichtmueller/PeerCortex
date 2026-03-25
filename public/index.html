@@ -433,7 +433,8 @@ function renderAspa(d) {
     h += '<div style="font-size:.8rem;font-weight:600;color:var(--orange);margin:.75rem 0 .4rem">Detected Upstream Providers</div>';
     h += '<div style="display:flex;flex-wrap:wrap;gap:.3rem;margin-bottom:1rem">';
     d.detected_providers.forEach(function(p) {
-      h += '<span class="badge badge-orange">' + asnLink(p.asn) + ' ' + escHtml(p.name) + '</span>';
+      var nameStr = (p.name && p.name !== 'AS' + p.asn) ? ' ' + escHtml(p.name) : '';
+      h += '<span class="badge badge-orange">' + asnLink(p.asn) + nameStr + '</span>';
     });
     h += '</div>';
   }
