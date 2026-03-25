@@ -1,0 +1,180 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 840" width="800" height="840">
+  <defs>
+    <style>
+      @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(4px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      .line { opacity: 0; animation: fadeIn 0.5s ease-out forwards; }
+      .l1  { animation-delay: 0.5s; }
+      .l2  { animation-delay: 1.3s; }
+      .l3  { animation-delay: 2.1s; }
+      .l4  { animation-delay: 2.5s; }
+      .l5  { animation-delay: 2.9s; }
+      .l6  { animation-delay: 3.3s; }
+      .l7  { animation-delay: 3.7s; }
+      .l8  { animation-delay: 4.1s; }
+      .l9  { animation-delay: 4.5s; }
+      .l10 { animation-delay: 5.3s; }
+      .l11 { animation-delay: 6.1s; }
+      .l12 { animation-delay: 6.5s; }
+      .l13 { animation-delay: 6.9s; }
+      .l14 { animation-delay: 7.3s; }
+      .l15 { animation-delay: 7.7s; }
+      .l16 { animation-delay: 8.1s; }
+      .l17 { animation-delay: 8.5s; }
+      .l18 { animation-delay: 8.9s; }
+      .l19 { animation-delay: 9.3s; }
+      .l20 { animation-delay: 10.1s; }
+      .l21 { animation-delay: 10.9s; }
+      .l22 { animation-delay: 11.3s; }
+      .l23 { animation-delay: 11.7s; }
+      .l24 { animation-delay: 12.1s; }
+      .l25 { animation-delay: 12.5s; }
+      .l26 { animation-delay: 12.9s; }
+      .l27 { animation-delay: 13.3s; }
+      .l28 { animation-delay: 13.7s; }
+      .l29 { animation-delay: 14.5s; }
+      .l30 { animation-delay: 15.3s; }
+      .l31 { animation-delay: 15.7s; }
+      .l32 { animation-delay: 16.1s; }
+      .l33 { animation-delay: 16.5s; }
+      .l34 { animation-delay: 16.9s; }
+      .l35 { animation-delay: 17.3s; }
+
+      text { font-family: 'Menlo', 'Monaco', 'Courier New', monospace; font-size: 13px; }
+      .prompt { fill: #7aa2f7; }
+      .cmd { fill: #c0caf5; }
+      .text { fill: #c0caf5; }
+      .header { fill: #bb9af7; }
+      .green { fill: #9ece6a; }
+      .warn { fill: #ff9e64; }
+      .red { fill: #f7768e; }
+      .dim { fill: #565f89; }
+      .cyan { fill: #7dcfff; }
+      .label { fill: #a9b1d6; }
+    </style>
+  </defs>
+
+  <!-- Terminal window background -->
+  <rect width="800" height="840" rx="10" ry="10" fill="#1a1b26"/>
+
+  <!-- Title bar -->
+  <rect width="800" height="36" rx="10" ry="10" fill="#24283b"/>
+  <rect y="20" width="800" height="16" fill="#24283b"/>
+
+  <!-- Traffic light dots -->
+  <circle cx="20" cy="18" r="6" fill="#f7768e"/>
+  <circle cx="40" cy="18" r="6" fill="#ff9e64"/>
+  <circle cx="60" cy="18" r="6" fill="#9ece6a"/>
+
+  <!-- Title text -->
+  <text x="400" y="22" text-anchor="middle" fill="#565f89" font-size="12" font-weight="600">PeerCortex v1.0.0</text>
+
+  <!-- Terminal content area -->
+  <g transform="translate(24, 56)">
+
+    <!-- Command 1: lookup -->
+    <g class="line l1">
+      <text y="0"><tspan class="prompt">$ </tspan><tspan class="cyan">peercortex</tspan><tspan class="cmd"> lookup AS13335</tspan></text>
+    </g>
+
+    <g class="line l2">
+      <text y="30" class="header">  &#x250C;&#x2500; Cloudflare, Inc. &#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;</text>
+    </g>
+    <g class="line l3">
+      <text y="50"><tspan class="header">  &#x2502;  </tspan><tspan class="label">ASN:        </tspan><tspan class="text">AS13335          </tspan><tspan class="label">IRR:     </tspan><tspan class="text">AS-CLOUDFLARE</tspan></text>
+    </g>
+    <g class="line l4">
+      <text y="70"><tspan class="header">  &#x2502;  </tspan><tspan class="label">Type:       </tspan><tspan class="text">CDN / Cloud      </tspan><tspan class="label">Policy:  </tspan><tspan class="green">Open</tspan></text>
+    </g>
+    <g class="line l5">
+      <text y="90"><tspan class="header">  &#x2502;  </tspan><tspan class="label">Prefixes:   </tspan><tspan class="text">1,847 IPv4       289 IPv6</tspan></text>
+    </g>
+    <g class="line l6">
+      <text y="110"><tspan class="header">  &#x2502;  </tspan><tspan class="label">IXPs:       </tspan><tspan class="text">312 exchanges    </tspan><tspan class="label">Facilities: </tspan><tspan class="text">387</tspan></text>
+    </g>
+    <g class="line l7">
+      <text y="130"><tspan class="header">  &#x2502;  </tspan><tspan class="label">RPKI:       </tspan><tspan class="green">98.7% signed     </tspan><tspan class="label">ROAs: </tspan><tspan class="text">2,136</tspan></text>
+    </g>
+    <g class="line l8">
+      <text y="150" class="header">  &#x2514;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;</text>
+    </g>
+
+    <!-- Command 2: peers find -->
+    <g class="line l10">
+      <text y="190"><tspan class="prompt">$ </tspan><tspan class="cyan">peercortex</tspan><tspan class="cmd"> peers find --asn 207613 --ix "DE-CIX Frankfurt"</tspan></text>
+    </g>
+
+    <g class="line l11">
+      <text y="220" class="header">  &#x1F91D; Recommended Peering Partners at DE-CIX Frankfurt:</text>
+    </g>
+    <g class="line l12">
+      <text y="250"><tspan class="dim">  #1  </tspan><tspan class="cyan">AS13335</tspan><tspan class="text">  Cloudflare       </tspan><tspan class="green">Score: 97</tspan><tspan class="text">  Open Policy   312 shared IXPs</tspan></text>
+    </g>
+    <g class="line l13">
+      <text y="270"><tspan class="dim">  #2  </tspan><tspan class="cyan">AS32934</tspan><tspan class="text">  Meta             </tspan><tspan class="green">Score: 94</tspan><tspan class="text">  Open Policy   187 shared IXPs</tspan></text>
+    </g>
+    <g class="line l14">
+      <text y="290"><tspan class="dim">  #3  </tspan><tspan class="cyan">AS15169</tspan><tspan class="text">  Google           </tspan><tspan class="green">Score: 91</tspan><tspan class="text">  Selective     245 shared IXPs</tspan></text>
+    </g>
+    <g class="line l15">
+      <text y="310"><tspan class="dim">  #4  </tspan><tspan class="cyan">AS16509</tspan><tspan class="text">  Amazon           </tspan><tspan class="green">Score: 88</tspan><tspan class="text">  Selective     156 shared IXPs</tspan></text>
+    </g>
+    <g class="line l16">
+      <text y="330"><tspan class="dim">  #5  </tspan><tspan class="cyan">AS714</tspan><tspan class="text">    Apple            </tspan><tspan class="green">Score: 85</tspan><tspan class="text">  Open Policy    98 shared IXPs</tspan></text>
+    </g>
+    <g class="line l17">
+      <text y="360" class="dim">  5 matches in 1.2s (filtered from 1,847 DE-CIX members)</text>
+    </g>
+
+    <!-- Command 3: rpki check -->
+    <g class="line l20">
+      <text y="400"><tspan class="prompt">$ </tspan><tspan class="cyan">peercortex</tspan><tspan class="cmd"> rpki check --asn 207613</tspan></text>
+    </g>
+
+    <g class="line l21">
+      <text y="430" class="header">  &#x1F6E1;&#xFE0F; RPKI Compliance Report &#x2014; AS207613</text>
+    </g>
+    <g class="line l22">
+      <text y="460"><tspan class="label">  ROA Coverage:     </tspan><tspan class="text">47/52 prefixes (</tspan><tspan class="green">90.4%</tspan><tspan class="text">)</tspan></text>
+    </g>
+    <g class="line l23">
+      <text y="480"><tspan class="label">  Valid:            </tspan><tspan class="green">45 (86.5%)</tspan></text>
+    </g>
+    <g class="line l24">
+      <text y="500"><tspan class="label">  Invalid:           </tspan><tspan class="red">2 (3.8%)</tspan><tspan class="warn">  &#x26A0; Action needed</tspan></text>
+    </g>
+    <g class="line l25">
+      <text y="520"><tspan class="label">  Not Found:         </tspan><tspan class="warn">5 (9.6%)</tspan></text>
+    </g>
+    <g class="line l26">
+      <text y="550"><tspan class="warn">  &#x26A0; INVALID: </tspan><tspan class="text">185.1.0.0/22 &#x2014; ROA maxLength mismatch</tspan></text>
+    </g>
+    <g class="line l27">
+      <text y="570"><tspan class="warn">  &#x26A0; INVALID: </tspan><tspan class="text">2001:db8::/32 &#x2014; Origin AS mismatch</tspan></text>
+    </g>
+
+    <!-- Command 4: bgp anomalies -->
+    <g class="line l29">
+      <text y="610"><tspan class="prompt">$ </tspan><tspan class="cyan">peercortex</tspan><tspan class="cmd"> bgp anomalies --asn 207613 --hours 24</tspan></text>
+    </g>
+
+    <g class="line l30">
+      <text y="640" class="header">  &#x1F50D; BGP Anomalies (last 24h):</text>
+    </g>
+    <g class="line l31">
+      <text y="670"><tspan class="green">  &#x2705; No route leaks detected</tspan></text>
+    </g>
+    <g class="line l32">
+      <text y="690"><tspan class="green">  &#x2705; No hijacks detected</tspan></text>
+    </g>
+    <g class="line l33">
+      <text y="710"><tspan class="warn">  &#x26A0;  1 path change: </tspan><tspan class="text">185.1.0.0/24 &#x2014; new upstream AS174 (was AS3356)</tspan></text>
+    </g>
+    <g class="line l35">
+      <text y="750"><tspan class="text">  Overall: </tspan><tspan class="green" font-weight="bold">HEALTHY</tspan></text>
+    </g>
+
+  </g>
+</svg>

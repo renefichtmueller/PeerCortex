@@ -1,0 +1,109 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#6C3CE1;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#2196F3;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="nodeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#A78BFA;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#60A5FA;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="coreGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#F0ABFC;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#818CF8;stop-opacity:1" />
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background circle -->
+  <circle cx="256" cy="256" r="240" fill="url(#bgGrad)" opacity="0.08"/>
+
+  <!-- Network connection lines -->
+  <g stroke="url(#nodeGrad)" stroke-width="2.5" opacity="0.6" stroke-linecap="round">
+    <!-- Outer ring connections -->
+    <line x1="256" y1="80" x2="400" y2="160"/>
+    <line x1="400" y1="160" x2="420" y2="310"/>
+    <line x1="420" y1="310" x2="340" y2="420"/>
+    <line x1="340" y1="420" x2="180" y2="420"/>
+    <line x1="180" y1="420" x2="95" y2="310"/>
+    <line x1="95" y1="310" x2="110" y2="160"/>
+    <line x1="110" y1="160" x2="256" y2="80"/>
+
+    <!-- Cross connections through center -->
+    <line x1="256" y1="80" x2="340" y2="420"/>
+    <line x1="256" y1="80" x2="180" y2="420"/>
+    <line x1="400" y1="160" x2="180" y2="420"/>
+    <line x1="400" y1="160" x2="95" y2="310"/>
+    <line x1="420" y1="310" x2="110" y2="160"/>
+    <line x1="420" y1="310" x2="180" y2="420"/>
+    <line x1="340" y1="420" x2="110" y2="160"/>
+    <line x1="95" y1="310" x2="400" y2="160"/>
+
+    <!-- Connections to center -->
+    <line x1="256" y1="256" x2="256" y2="80"/>
+    <line x1="256" y1="256" x2="400" y2="160"/>
+    <line x1="256" y1="256" x2="420" y2="310"/>
+    <line x1="256" y1="256" x2="340" y2="420"/>
+    <line x1="256" y1="256" x2="180" y2="420"/>
+    <line x1="256" y1="256" x2="95" y2="310"/>
+    <line x1="256" y1="256" x2="110" y2="160"/>
+  </g>
+
+  <!-- Brain/cortex overlay paths (stylized neural pathways) -->
+  <g fill="none" stroke="url(#coreGrad)" stroke-width="2" opacity="0.4" filter="url(#glow)">
+    <path d="M200,220 C220,190 250,180 256,200 C262,180 292,190 312,220"/>
+    <path d="M190,260 C210,240 240,235 256,250 C272,235 302,240 322,260"/>
+    <path d="M200,300 C220,280 250,275 256,290 C262,275 292,280 312,300"/>
+    <path d="M220,200 C230,220 240,250 256,256 C272,250 282,220 292,200"/>
+    <path d="M210,310 C225,290 245,270 256,256 C267,270 287,290 302,310"/>
+  </g>
+
+  <!-- Outer network nodes -->
+  <g filter="url(#glow)">
+    <!-- Top node -->
+    <circle cx="256" cy="80" r="18" fill="url(#nodeGrad)" stroke="#fff" stroke-width="2"/>
+    <!-- Top-right node -->
+    <circle cx="400" cy="160" r="16" fill="url(#nodeGrad)" stroke="#fff" stroke-width="2"/>
+    <!-- Right node -->
+    <circle cx="420" cy="310" r="14" fill="url(#nodeGrad)" stroke="#fff" stroke-width="2"/>
+    <!-- Bottom-right node -->
+    <circle cx="340" cy="420" r="16" fill="url(#nodeGrad)" stroke="#fff" stroke-width="2"/>
+    <!-- Bottom-left node -->
+    <circle cx="180" cy="420" r="14" fill="url(#nodeGrad)" stroke="#fff" stroke-width="2"/>
+    <!-- Left node -->
+    <circle cx="95" cy="310" r="16" fill="url(#nodeGrad)" stroke="#fff" stroke-width="2"/>
+    <!-- Top-left node -->
+    <circle cx="110" cy="160" r="14" fill="url(#nodeGrad)" stroke="#fff" stroke-width="2"/>
+  </g>
+
+  <!-- Central brain/cortex node -->
+  <circle cx="256" cy="256" r="45" fill="url(#bgGrad)" stroke="#fff" stroke-width="3" filter="url(#glow)"/>
+  <circle cx="256" cy="256" r="35" fill="none" stroke="url(#coreGrad)" stroke-width="1.5" opacity="0.7"/>
+  <circle cx="256" cy="256" r="25" fill="none" stroke="url(#coreGrad)" stroke-width="1" opacity="0.5"/>
+
+  <!-- Brain icon in center -->
+  <g transform="translate(236, 236)" fill="white" opacity="0.9">
+    <path d="M20,5 C14,2 8,5 6,10 C3,8 0,11 0,15 C0,19 2,22 5,23 C4,26 5,30 8,32 C10,34 14,35 17,33 C18,36 22,38 26,36 C28,35 30,32 30,29 C33,30 36,28 37,25 C38,22 37,19 35,17 C38,15 39,11 37,8 C35,5 31,4 28,5 C27,2 24,0 20,0 C18,0 16,1 15,3" stroke="white" stroke-width="1.5" fill="none"/>
+    <line x1="20" y1="10" x2="20" y2="33" stroke="white" stroke-width="1.2"/>
+    <path d="M20,14 C16,12 12,14 12,18" stroke="white" stroke-width="1" fill="none"/>
+    <path d="M20,20 C24,18 28,20 28,24" stroke="white" stroke-width="1" fill="none"/>
+    <path d="M20,26 C16,24 12,26 14,30" stroke="white" stroke-width="1" fill="none"/>
+  </g>
+
+  <!-- Small accent dots on connection lines -->
+  <g fill="#A78BFA" opacity="0.8">
+    <circle cx="328" cy="120" r="4"/>
+    <circle cx="410" cy="235" r="3.5"/>
+    <circle cx="380" cy="365" r="4"/>
+    <circle cx="260" cy="420" r="3.5"/>
+    <circle cx="138" cy="365" r="4"/>
+    <circle cx="103" cy="235" r="3.5"/>
+    <circle cx="183" cy="120" r="4"/>
+  </g>
+</svg>
