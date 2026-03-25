@@ -1,0 +1,777 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PeerCortex - Network Intelligence Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+--bg:#0f0f1a;--card:#1a1b26;--card-hover:#1f2030;--border:#2a2b3d;--border-light:#363750;
+--purple:#bb9af7;--blue:#7aa2f7;--green:#9ece6a;--orange:#ff9e64;--red:#f7768e;
+--cyan:#7dcfff;--yellow:#e0af68;--white:#c0caf5;--muted:#565f89;--dim:#414868;
+--text:#c0caf5;--text-dim:#a9b1d6;
+}
+body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--text);line-height:1.6;min-height:100vh}
+a{color:var(--blue);text-decoration:none;transition:color .2s}a:hover{color:var(--cyan)}
+
+.header{background:linear-gradient(180deg,#1a1b2e 0%,var(--bg) 100%);border-bottom:1px solid var(--border);padding:1.5rem 0}
+.header-inner{max-width:1200px;margin:0 auto;padding:0 1.5rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem}
+.logo{display:flex;align-items:center;gap:.75rem}
+.logo svg{width:36px;height:36px}
+.logo h1{font-size:1.4rem;font-weight:700;color:var(--purple);letter-spacing:-.02em}
+.logo span{font-size:.75rem;color:var(--muted);font-weight:400}
+.quick-links{display:flex;gap:.75rem;flex-wrap:wrap}
+.quick-links a{font-size:.75rem;padding:.35rem .7rem;border:1px solid var(--border);border-radius:6px;color:var(--muted);transition:all .2s}
+.quick-links a:hover{border-color:var(--blue);color:var(--blue)}
+
+.search-section{max-width:1200px;margin:2rem auto;padding:0 1.5rem}
+.search-box{display:flex;gap:.75rem;align-items:stretch}
+.search-input{flex:1;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:.85rem 1.2rem;font-size:1rem;color:var(--text);font-family:inherit;outline:none;transition:border-color .2s}
+.search-input:focus{border-color:var(--purple)}
+.search-input::placeholder{color:var(--dim)}
+.search-btn{background:linear-gradient(135deg,var(--purple),var(--blue));border:none;border-radius:10px;padding:.85rem 2rem;font-size:1rem;font-weight:600;color:#fff;cursor:pointer;font-family:inherit;transition:opacity .2s;white-space:nowrap}
+.search-btn:hover{opacity:.9}
+.search-btn:disabled{opacity:.5;cursor:not-allowed}
+
+.dashboard{max-width:1200px;margin:0 auto;padding:0 1.5rem 3rem;display:grid;grid-template-columns:1fr 1fr;gap:1.25rem}
+@media(max-width:768px){.dashboard{grid-template-columns:1fr}}
+.card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:1.5rem;transition:border-color .2s}
+.card:hover{border-color:var(--border-light)}
+.card.full{grid-column:1/-1}
+.card-title{font-size:.85rem;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--purple);margin-bottom:1rem;display:flex;align-items:center;gap:.5rem}
+.card-title svg{width:18px;height:18px;opacity:.7}
+
+.stat-row{display:flex;gap:1.5rem;flex-wrap:wrap;margin-bottom:1rem}
+.stat{text-align:center}
+.stat-val{font-size:1.8rem;font-weight:700;color:var(--green);line-height:1.2}
+.stat-val.blue{color:var(--blue)}.stat-val.purple{color:var(--purple)}.stat-val.orange{color:var(--orange)}.stat-val.red{color:var(--red)}.stat-val.cyan{color:var(--cyan)}
+.stat-label{font-size:.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+
+.badge{display:inline-block;padding:.2rem .6rem;border-radius:5px;font-size:.7rem;font-weight:600;margin-right:.4rem;margin-bottom:.3rem}
+.badge-purple{background:rgba(187,154,247,.15);color:var(--purple)}
+.badge-blue{background:rgba(122,162,247,.15);color:var(--blue)}
+.badge-green{background:rgba(158,206,106,.15);color:var(--green)}
+.badge-orange{background:rgba(255,158,100,.15);color:var(--orange)}
+.badge-red{background:rgba(247,118,142,.15);color:var(--red)}
+.badge-cyan{background:rgba(125,207,255,.15);color:var(--cyan)}
+
+.progress-wrap{height:8px;background:var(--border);border-radius:4px;overflow:hidden;margin:.5rem 0}
+.progress-bar{height:100%;border-radius:4px;transition:width .5s ease}
+.progress-bar.green{background:var(--green)}.progress-bar.red{background:var(--red)}.progress-bar.orange{background:var(--orange)}.progress-bar.blue{background:var(--blue)}
+.progress-multi{display:flex;height:8px;border-radius:4px;overflow:hidden;margin:.5rem 0;background:var(--border)}
+.progress-multi>div{height:100%;transition:width .5s ease}
+
+.tbl{width:100%;border-collapse:collapse;font-size:.8rem}
+.tbl th{text-align:left;padding:.5rem .6rem;color:var(--muted);font-weight:600;font-size:.7rem;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid var(--border)}
+.tbl td{padding:.5rem .6rem;border-bottom:1px solid rgba(42,43,61,.5);color:var(--text-dim)}
+.tbl tr:hover td{background:rgba(187,154,247,.03)}
+.tbl .asn-link{color:var(--blue);cursor:pointer;font-weight:500}
+.tbl .asn-link:hover{color:var(--cyan);text-decoration:underline}
+
+.rpki-valid{color:var(--green)}.rpki-invalid{color:var(--red)}.rpki-unknown{color:var(--muted)}
+
+.big-score{font-size:4rem;font-weight:800;line-height:1;margin:.5rem 0}
+.big-score.high{color:var(--green)}.big-score.mid{color:var(--orange)}.big-score.low{color:var(--red)}
+
+.ext-links{display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.75rem}
+.ext-link{font-size:.75rem;padding:.3rem .65rem;border:1px solid var(--border);border-radius:6px;color:var(--text-dim);transition:all .2s}
+.ext-link:hover{border-color:var(--blue);color:var(--blue)}
+
+.net-name{font-size:1.6rem;font-weight:700;color:var(--white);margin-bottom:.25rem}
+.net-aka{font-size:.9rem;color:var(--muted);margin-bottom:.75rem}
+
+.compare-section{max-width:1200px;margin:0 auto;padding:0 1.5rem 1rem}
+.compare-box{display:flex;gap:.75rem;align-items:stretch;flex-wrap:wrap}
+.compare-input{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:.65rem 1rem;font-size:.9rem;color:var(--text);font-family:inherit;outline:none;width:160px;transition:border-color .2s}
+.compare-input:focus{border-color:var(--purple)}
+.compare-btn{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:.65rem 1.5rem;font-size:.85rem;font-weight:600;color:var(--purple);cursor:pointer;font-family:inherit;transition:all .2s}
+.compare-btn:hover{border-color:var(--purple);background:rgba(187,154,247,.1)}
+
+.expand-toggle{font-size:.75rem;color:var(--blue);cursor:pointer;margin-top:.5rem;display:inline-block}
+.expand-toggle:hover{text-decoration:underline}
+.expand-body{display:none;margin-top:.5rem}
+.expand-body.open{display:block}
+
+.skeleton{background:linear-gradient(90deg,var(--border) 25%,var(--border-light) 50%,var(--border) 75%);background-size:200% 100%;animation:shimmer 1.5s infinite;border-radius:6px;height:1rem;margin:.4rem 0}
+@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+.skeleton.h2{height:2rem;width:60%}.skeleton.h3{height:1.2rem;width:40%}.skeleton.wide{width:100%}.skeleton.med{width:70%}
+
+.meta-bar{text-align:center;font-size:.75rem;color:var(--dim);margin-top:1rem;padding:0 1.5rem}
+
+.footer{text-align:center;padding:2rem 1.5rem;color:var(--dim);font-size:.75rem;border-top:1px solid var(--border);margin-top:2rem}
+.footer a{color:var(--muted)}
+
+.flag{font-size:1.2rem;margin-right:.3rem}
+
+.hidden{display:none !important}
+
+.scroll-wrap{max-height:300px;overflow-y:auto}
+.scroll-wrap::-webkit-scrollbar{width:6px}
+.scroll-wrap::-webkit-scrollbar-track{background:transparent}
+.scroll-wrap::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+
+.compare-results{max-width:1200px;margin:0 auto;padding:0 1.5rem 1rem}
+
+/* ASPA specific */
+.aspa-template{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:1rem;font-family:'Courier New',monospace;font-size:.75rem;color:var(--cyan);white-space:pre-wrap;word-break:break-all;position:relative;margin:.5rem 0}
+.copy-btn{position:absolute;top:.5rem;right:.5rem;background:var(--card);border:1px solid var(--border);border-radius:6px;padding:.3rem .6rem;font-size:.7rem;color:var(--muted);cursor:pointer;transition:all .2s}
+.copy-btn:hover{border-color:var(--purple);color:var(--purple)}
+
+/* Status indicator */
+.status-yes{color:var(--green);font-weight:600}
+.status-no{color:var(--red);font-weight:600}
+.status-unknown{color:var(--muted);font-weight:600}
+
+/* Loading spinner for sections */
+.section-loading{text-align:center;padding:1rem;color:var(--muted);font-size:.8rem}
+.section-loading::before{content:'';display:inline-block;width:16px;height:16px;border:2px solid var(--border);border-top-color:var(--purple);border-radius:50%;animation:spin .8s linear infinite;margin-right:.5rem;vertical-align:middle}
+@keyframes spin{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<header class="header">
+<div class="header-inner">
+  <div class="logo">
+    <svg viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="18" cy="18" r="16" stroke="#bb9af7" stroke-width="2"/>
+      <circle cx="18" cy="10" r="3" fill="#bb9af7"/>
+      <circle cx="10" cy="24" r="3" fill="#7aa2f7"/>
+      <circle cx="26" cy="24" r="3" fill="#9ece6a"/>
+      <line x1="18" y1="13" x2="11" y2="22" stroke="#565f89" stroke-width="1.5"/>
+      <line x1="18" y1="13" x2="25" y2="22" stroke="#565f89" stroke-width="1.5"/>
+      <line x1="13" y1="24" x2="23" y2="24" stroke="#565f89" stroke-width="1.5"/>
+    </svg>
+    <div><h1>PeerCortex</h1><span>Network Intelligence Dashboard v0.2</span></div>
+  </div>
+  <nav class="quick-links">
+    <a href="https://github.com/peercortex/peercortex" target="_blank">GitHub</a>
+    <a href="https://www.peeringdb.com" target="_blank">PeeringDB</a>
+    <a href="https://stat.ripe.net" target="_blank">RIPE Stat</a>
+    <a href="https://bgp.he.net" target="_blank">bgp.he.net</a>
+    <a href="https://atlas.ripe.net" target="_blank">RIPE Atlas</a>
+    <a href="https://bgproutes.io" target="_blank">bgproutes.io</a>
+  </nav>
+</div>
+</header>
+
+<!-- Search -->
+<section class="search-section">
+<div class="search-box">
+  <input type="text" class="search-input" id="asnInput" placeholder="Enter ASN (e.g. 13335, 6939, 174)" value="" autofocus>
+  <button class="search-btn" id="searchBtn" onclick="doLookup()">Lookup</button>
+</div>
+</section>
+
+<!-- Meta bar -->
+<div class="meta-bar" id="metaBar"></div>
+
+<!-- Dashboard -->
+<div class="dashboard hidden" id="dashboard">
+
+  <!-- Network Overview -->
+  <div class="card full" id="overviewCard">
+    <div class="card-title">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+      Network Overview
+    </div>
+    <div id="overviewContent"></div>
+  </div>
+
+  <!-- Prefixes -->
+  <div class="card" id="prefixCard">
+    <div class="card-title">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v16H4z"/><path d="M4 12h16M12 4v16"/></svg>
+      Announced Prefixes
+    </div>
+    <div id="prefixContent"></div>
+  </div>
+
+  <!-- RPKI Compliance -->
+  <div class="card" id="rpkiCard">
+    <div class="card-title">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      RPKI Compliance
+    </div>
+    <div id="rpkiContent"></div>
+  </div>
+
+  <!-- ASPA Intelligence (NEW) -->
+  <div class="card full" id="aspaCard">
+    <div class="card-title">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2v-4M9 21H5a2 2 0 0 1-2-2v-4"/></svg>
+      ASPA Status
+    </div>
+    <div id="aspaContent"><div class="section-loading">Loading ASPA data...</div></div>
+  </div>
+
+  <!-- bgproutes.io (NEW) -->
+  <div class="card full" id="bgroutesCard">
+    <div class="card-title">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      bgproutes.io
+    </div>
+    <div id="bgroutesContent"><div class="section-loading">Loading bgproutes.io data...</div></div>
+  </div>
+
+  <!-- Neighbours -->
+  <div class="card full" id="neighbourCard">
+    <div class="card-title">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      AS Neighbours
+    </div>
+    <div id="neighbourContent"></div>
+  </div>
+
+  <!-- IX Presence -->
+  <div class="card full" id="ixCard">
+    <div class="card-title">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="1" width="22" height="22" rx="2"/><path d="M7 1v22M17 1v22M1 12h22M1 7h22M1 17h22"/></svg>
+      IX Presence
+    </div>
+    <div id="ixContent"></div>
+  </div>
+
+  <!-- Facilities -->
+  <div class="card" id="facCard">
+    <div class="card-title">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M3 7v14M21 7v14M6 21V10M10 21V10M14 21V10M18 21V10M12 7l9-4H3l9 4z"/></svg>
+      Facilities
+    </div>
+    <div id="facContent"></div>
+  </div>
+
+  <!-- Quick Compare -->
+  <div class="card" id="compareCard">
+    <div class="card-title">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>
+      Quick Compare
+    </div>
+    <div id="compareContent">
+      <p style="font-size:.8rem;color:var(--muted);margin-bottom:.75rem">Compare IX, facility, upstream overlap and RPKI coverage with another network.</p>
+      <div class="compare-box">
+        <input type="text" class="compare-input" id="compareAsn" placeholder="Second ASN">
+        <button class="compare-btn" onclick="doCompare()">Compare</button>
+      </div>
+      <div id="compareResults" style="margin-top:1rem"></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Loading Skeleton -->
+<div class="dashboard hidden" id="skeleton">
+  <div class="card full"><div class="card-title">Network Overview</div><div class="skeleton h2"></div><div class="skeleton h3"></div><div class="skeleton wide"></div><div class="skeleton med"></div></div>
+  <div class="card"><div class="card-title">Announced Prefixes</div><div class="skeleton h2"></div><div class="skeleton wide"></div><div class="skeleton med"></div></div>
+  <div class="card"><div class="card-title">RPKI Compliance</div><div class="skeleton h2"></div><div class="skeleton wide"></div></div>
+  <div class="card full"><div class="card-title">ASPA Status</div><div class="skeleton wide"></div><div class="skeleton med"></div></div>
+  <div class="card full"><div class="card-title">bgproutes.io</div><div class="skeleton wide"></div><div class="skeleton med"></div></div>
+  <div class="card full"><div class="card-title">AS Neighbours</div><div class="skeleton wide"></div><div class="skeleton wide"></div><div class="skeleton med"></div></div>
+  <div class="card full"><div class="card-title">IX Presence</div><div class="skeleton wide"></div><div class="skeleton wide"></div></div>
+  <div class="card"><div class="card-title">Facilities</div><div class="skeleton wide"></div><div class="skeleton med"></div></div>
+  <div class="card"><div class="card-title">Quick Compare</div><div class="skeleton med"></div></div>
+</div>
+
+<!-- Footer -->
+<footer class="footer">
+  PeerCortex v0.2.0 &mdash; Open Source &mdash; MIT License<br>
+  <a href="https://github.com/renefichtmueller/PaperCortex" target="_blank">PaperCortex</a> &middot;
+  <a href="https://github.com/peercortex/peercortex" target="_blank">PeerCortex GitHub</a>
+</footer>
+
+<script>
+const $ = id => document.getElementById(id);
+let currentAsn = null;
+
+function countryFlag(code) {
+  if (!code || code.length !== 2) return '';
+  const c = code.toUpperCase();
+  return String.fromCodePoint(...[...c].map(ch => 0x1F1E6 + ch.charCodeAt(0) - 65));
+}
+
+function fmtSpeed(mbps) {
+  if (!mbps || mbps === 0) return '-';
+  if (mbps >= 1000) return (mbps / 1000) + ' Gbps';
+  return mbps + ' Mbps';
+}
+
+function rpkiIcon(status) {
+  if (status === 'valid') return '<span class="rpki-valid" title="RPKI Valid">&#10003;</span>';
+  if (status === 'invalid') return '<span class="rpki-invalid" title="RPKI Invalid">&#10007;</span>';
+  return '<span class="rpki-unknown" title="Not Found">?</span>';
+}
+
+function pct(n, total) {
+  if (!total) return 0;
+  return Math.round((n / total) * 100);
+}
+
+function asnLink(asn) {
+  return '<span class="asn-link" onclick="lookupAsn(' + asn + ')" title="Lookup AS' + asn + '">AS' + asn + '</span>';
+}
+
+function lookupAsn(asn) {
+  $('asnInput').value = asn;
+  doLookup();
+}
+
+function copyToClipboard(text, btn) {
+  navigator.clipboard.writeText(text).then(function() {
+    var orig = btn.textContent;
+    btn.textContent = 'Copied!';
+    setTimeout(function() { btn.textContent = orig; }, 1500);
+  });
+}
+
+async function doLookup() {
+  const raw = $('asnInput').value.trim().replace(/[^0-9]/g, '');
+  if (!raw) return;
+  currentAsn = raw;
+
+  $('searchBtn').disabled = true;
+  $('searchBtn').textContent = 'Loading...';
+  $('dashboard').classList.add('hidden');
+  $('skeleton').classList.remove('hidden');
+  $('metaBar').textContent = '';
+
+  try {
+    const resp = await fetch('/api/lookup?asn=' + raw);
+    const d = await resp.json();
+
+    if (d.error) {
+      $('skeleton').classList.add('hidden');
+      $('metaBar').textContent = 'Error: ' + d.error;
+      return;
+    }
+
+    renderDashboard(d);
+    $('skeleton').classList.add('hidden');
+    $('dashboard').classList.remove('hidden');
+    $('metaBar').textContent = 'Query: ' + d.meta.query + ' | Duration: ' + d.meta.duration_ms + 'ms | RPKI checked: ' + d.meta.rpki_prefixes_checked + '/' + d.meta.total_prefixes + ' prefixes | ' + d.meta.timestamp;
+
+    history.replaceState(null, '', '?asn=' + raw);
+
+    // Load ASPA and bgproutes.io data asynchronously
+    loadAspaData(raw);
+    loadBgroutesData(raw);
+  } catch (e) {
+    $('skeleton').classList.add('hidden');
+    $('metaBar').textContent = 'Error: ' + e.message;
+  } finally {
+    $('searchBtn').disabled = false;
+    $('searchBtn').textContent = 'Lookup';
+  }
+}
+
+async function loadAspaData(asn) {
+  $('aspaContent').innerHTML = '<div class="section-loading">Loading ASPA data...</div>';
+  try {
+    const resp = await fetch('/api/aspa?asn=' + asn);
+    const d = await resp.json();
+    if (d.error) {
+      $('aspaContent').innerHTML = '<div style="color:var(--red);font-size:.85rem">ASPA check failed: ' + escHtml(d.error) + '</div>';
+      return;
+    }
+    renderAspa(d);
+  } catch (e) {
+    $('aspaContent').innerHTML = '<div style="color:var(--red);font-size:.85rem">ASPA check failed: ' + escHtml(e.message) + '</div>';
+  }
+}
+
+async function loadBgroutesData(asn) {
+  $('bgroutesContent').innerHTML = '<div class="section-loading">Loading bgproutes.io data...</div>';
+  try {
+    const resp = await fetch('/api/bgproutes?asn=' + asn);
+    const d = await resp.json();
+    if (d.error) {
+      $('bgroutesContent').innerHTML = '<div style="color:var(--red);font-size:.85rem">bgproutes.io query failed: ' + escHtml(d.error) + '</div>';
+      return;
+    }
+    renderBgroutes(d);
+  } catch (e) {
+    $('bgroutesContent').innerHTML = '<div style="color:var(--red);font-size:.85rem">bgproutes.io query failed: ' + escHtml(e.message) + '</div>';
+  }
+}
+
+function renderAspa(d) {
+  let h = '';
+
+  // ASPA status
+  h += '<div style="display:flex;gap:2rem;flex-wrap:wrap;margin-bottom:1rem">';
+  h += '<div><div style="font-size:.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.25rem">ASPA Object</div>';
+  if (d.aspa_object_exists) {
+    h += '<div class="status-yes">Found in RIPE DB</div>';
+  } else {
+    h += '<div class="status-no">Not Found</div>';
+  }
+  h += '</div>';
+  h += '<div><div style="font-size:.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.25rem">Detected Providers</div>';
+  h += '<div style="font-size:1.5rem;font-weight:700;color:var(--blue)">' + d.provider_count + '</div>';
+  h += '</div>';
+  h += '<div><div style="font-size:.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.25rem">BGP Paths Analyzed</div>';
+  h += '<div style="font-size:1.5rem;font-weight:700;color:var(--cyan)">' + (d.path_analysis ? d.path_analysis.total_paths_seen : 0) + '</div>';
+  h += '</div>';
+  h += '</div>';
+
+  // Detected providers
+  if (d.detected_providers && d.detected_providers.length > 0) {
+    h += '<div style="font-size:.8rem;font-weight:600;color:var(--orange);margin:.75rem 0 .4rem">Detected Upstream Providers</div>';
+    h += '<div style="display:flex;flex-wrap:wrap;gap:.3rem;margin-bottom:1rem">';
+    d.detected_providers.forEach(function(p) {
+      h += '<span class="badge badge-orange">' + asnLink(p.asn) + ' ' + escHtml(p.name) + '</span>';
+    });
+    h += '</div>';
+  }
+
+  // Recommended ASPA template
+  if (d.recommended_aspa) {
+    h += '<div style="font-size:.8rem;font-weight:600;color:var(--cyan);margin:.75rem 0 .4rem">Recommended ASPA Object</div>';
+    h += '<div class="aspa-template" id="aspaTemplate">' + escHtml(d.recommended_aspa);
+    h += '<button class="copy-btn" onclick="copyToClipboard(document.getElementById(\'aspaTemplate\').innerText, this)">Copy</button>';
+    h += '</div>';
+  }
+
+  // Sample path analysis
+  if (d.path_analysis && d.path_analysis.sample_paths && d.path_analysis.sample_paths.length > 0) {
+    h += '<div class="expand-toggle" onclick="toggleExpand(this)">Show sample BGP paths (' + d.path_analysis.sample_paths.length + ')</div>';
+    h += '<div class="expand-body"><div class="scroll-wrap"><table class="tbl"><thead><tr><th>RRC</th><th>Prefix</th><th>AS Path</th><th>Provider</th></tr></thead><tbody>';
+    d.path_analysis.sample_paths.forEach(function(p) {
+      h += '<tr><td>' + escHtml(p.rrc || '') + '</td>';
+      h += '<td style="font-family:monospace;font-size:.75rem">' + escHtml(p.prefix || '') + '</td>';
+      h += '<td style="font-family:monospace;font-size:.7rem">' + escHtml(p.path || '') + '</td>';
+      h += '<td>' + (p.detected_provider ? '<span class="badge badge-green">' + escHtml(p.detected_provider) + '</span>' : '-') + '</td></tr>';
+    });
+    h += '</tbody></table></div></div>';
+  }
+
+  h += '<div style="font-size:.7rem;color:var(--dim);margin-top:.5rem">Analyzed in ' + (d.meta ? d.meta.duration_ms : '?') + 'ms</div>';
+  $('aspaContent').innerHTML = h;
+}
+
+function renderBgroutes(d) {
+  let h = '';
+
+  h += '<div style="display:flex;gap:2rem;flex-wrap:wrap;margin-bottom:1rem">';
+
+  // Vantage points
+  if (d.vantage_points) {
+    h += '<div><div style="font-size:.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.25rem">Vantage Points</div>';
+    h += '<div style="font-size:1.5rem;font-weight:700;color:var(--green)">' + (d.vantage_points.count || 0) + '</div>';
+    h += '</div>';
+  }
+
+  // Route data status
+  if (d.routes) {
+    h += '<div><div style="font-size:.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.25rem">Route Data</div>';
+    if (d.routes.status === 'unavailable') {
+      h += '<div style="font-size:.85rem;color:var(--orange)">' + escHtml(d.routes.message) + '</div>';
+    } else {
+      h += '<div style="font-size:1.5rem;font-weight:700;color:var(--blue)">' + (d.routes.count || 0) + ' routes</div>';
+    }
+    h += '</div>';
+  }
+
+  h += '</div>';
+
+  // VP list
+  if (d.vantage_points && d.vantage_points.list && d.vantage_points.list.length > 0) {
+    h += '<div class="expand-toggle" onclick="toggleExpand(this)">Show vantage points (' + d.vantage_points.list.length + ')</div>';
+    h += '<div class="expand-body"><div class="scroll-wrap" style="max-height:200px"><table class="tbl"><thead><tr><th>ID</th><th>Name</th><th>Location</th><th>ASN</th></tr></thead><tbody>';
+    d.vantage_points.list.forEach(function(vp) {
+      h += '<tr><td>' + escHtml(vp.id || vp.vp_id || '') + '</td>';
+      h += '<td>' + escHtml(vp.name || vp.description || '') + '</td>';
+      h += '<td>' + escHtml(vp.location || vp.city || vp.country || '') + '</td>';
+      h += '<td>' + escHtml(vp.asn || vp.peer_asn || '') + '</td></tr>';
+    });
+    h += '</tbody></table></div></div>';
+  }
+
+  // Route samples
+  if (d.routes && d.routes.sample && d.routes.sample.length > 0) {
+    if (d.routes.vp_used) {
+      h += '<div style="font-size:.75rem;color:var(--muted);margin-bottom:.5rem">VP: ' + escHtml(d.routes.vp_used.org || '') + ' (' + escHtml(d.routes.vp_used.country || '') + ', ID ' + (d.routes.vp_used.id || '') + ')</div>';
+    }
+    h += '<div class="expand-toggle" onclick="toggleExpand(this)">Show route data (' + d.routes.count + ' routes, showing ' + d.routes.sample.length + ')</div>';
+    h += '<div class="expand-body"><div class="scroll-wrap"><table class="tbl"><thead><tr><th>Prefix</th><th>AS Path</th><th>ROV</th><th>ASPA</th></tr></thead><tbody>';
+    d.routes.sample.forEach(function(r) {
+      var rovBadge = (r.rov_status || '').indexOf('valid') >= 0 ? 'badge-green' : (r.rov_status || '').indexOf('invalid') >= 0 ? 'badge-red' : 'badge-orange';
+      var aspaBadge = (r.aspa_status || '') === 'valid' ? 'badge-green' : (r.aspa_status || '') === 'invalid' ? 'badge-red' : 'badge-orange';
+      h += '<tr><td style="font-family:monospace;font-size:.7rem">' + escHtml(r.prefix || '') + '</td>';
+      h += '<td style="font-family:monospace;font-size:.65rem;max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + escAttr(r.as_path || '') + '">' + escHtml(r.as_path || '') + '</td>';
+      h += '<td><span class="badge ' + rovBadge + '">' + escHtml(r.rov_status || '?') + '</span></td>';
+      h += '<td><span class="badge ' + aspaBadge + '">' + escHtml(r.aspa_status || '?') + '</span></td></tr>';
+    });
+    h += '</tbody></table></div></div>';
+  }
+
+  h += '<div style="font-size:.7rem;color:var(--dim);margin-top:.5rem">Queried in ' + (d.meta ? d.meta.duration_ms : '?') + 'ms</div>';
+  $('bgroutesContent').innerHTML = h;
+}
+
+function renderDashboard(d) {
+  const n = d.network;
+  const p = d.prefixes;
+  const r = d.rpki;
+  const nb = d.neighbours;
+  const ix = d.ix_presence;
+  const fac = d.facilities;
+
+  // Overview
+  let ov = '<div class="net-name">' + escHtml(n.name) + ' <span style="color:var(--muted);font-size:1rem">AS' + n.asn + '</span></div>';
+  if (n.aka) ov += '<div class="net-aka">AKA: ' + escHtml(n.aka) + '</div>';
+  if (n.country) ov += '<span class="flag">' + countryFlag(n.country) + '</span>';
+  if (n.rir) ov += '<span class="badge badge-cyan">' + escHtml(n.rir) + '</span>';
+  if (n.type) ov += '<span class="badge badge-purple">' + escHtml(n.type) + '</span>';
+  if (n.policy) ov += '<span class="badge badge-blue">' + escHtml(n.policy) + '</span>';
+  if (n.ratio) ov += '<span class="badge badge-green">' + escHtml(n.ratio) + '</span>';
+  if (n.scope) ov += '<span class="badge badge-orange">' + escHtml(n.scope) + '</span>';
+  if (n.traffic) ov += '<span class="badge badge-cyan">' + escHtml(n.traffic) + '</span>';
+  if (n.website) ov += '<div style="margin-top:.5rem"><a href="' + escAttr(n.website) + '" target="_blank">' + escHtml(n.website) + '</a></div>';
+  if (n.notes) ov += '<div style="margin-top:.5rem;font-size:.8rem;color:var(--muted)">' + escHtml(n.notes) + '</div>';
+
+  ov += '<div class="ext-links">';
+  if (n.peeringdb_id) ov += '<a class="ext-link" href="https://www.peeringdb.com/net/' + n.peeringdb_id + '" target="_blank">PeeringDB</a>';
+  ov += '<a class="ext-link" href="https://bgp.he.net/AS' + n.asn + '" target="_blank">bgp.he.net</a>';
+  ov += '<a class="ext-link" href="https://stat.ripe.net/AS' + n.asn + '" target="_blank">RIPE Stat</a>';
+  ov += '<a class="ext-link" href="https://bgproutes.io/search/AS' + n.asn + '" target="_blank">bgproutes.io</a>';
+  if (n.looking_glass) ov += '<a class="ext-link" href="' + escAttr(n.looking_glass) + '" target="_blank">Looking Glass</a>';
+  if (n.route_server) ov += '<a class="ext-link" href="' + escAttr(n.route_server) + '" target="_blank">Route Server</a>';
+  ov += '</div>';
+  $('overviewContent').innerHTML = ov;
+
+  // Prefixes
+  let px = '<div class="stat-row">';
+  px += '<div class="stat"><div class="stat-val blue">' + p.total + '</div><div class="stat-label">Total</div></div>';
+  px += '<div class="stat"><div class="stat-val green">' + p.ipv4 + '</div><div class="stat-label">IPv4</div></div>';
+  px += '<div class="stat"><div class="stat-val purple">' + p.ipv6 + '</div><div class="stat-label">IPv6</div></div>';
+  px += '</div>';
+
+  const v4pct = pct(p.ipv4, p.total);
+  px += '<div style="font-size:.7rem;color:var(--muted)">IPv4 ' + v4pct + '% / IPv6 ' + (100 - v4pct) + '%</div>';
+  px += '<div class="progress-multi"><div style="width:' + v4pct + '%;background:var(--green)"></div><div style="width:' + (100 - v4pct) + '%;background:var(--purple)"></div></div>';
+
+  if (p.list && p.list.length > 0) {
+    px += '<div class="expand-toggle" onclick="toggleExpand(this)">Show all ' + p.list.length + ' prefixes</div>';
+    px += '<div class="expand-body"><div class="scroll-wrap"><table class="tbl"><thead><tr><th>Prefix</th><th>RPKI</th></tr></thead><tbody>';
+    const rpkiMap = {};
+    (r.details || []).forEach(function(rd) { rpkiMap[rd.prefix] = rd.status; });
+    p.list.forEach(function(pfx) {
+      const st = rpkiMap[pfx] || 'not_checked';
+      px += '<tr><td style="font-family:monospace;font-size:.8rem">' + escHtml(pfx) + '</td><td>' + rpkiIcon(st) + '</td></tr>';
+    });
+    px += '</tbody></table></div></div>';
+  }
+  $('prefixContent').innerHTML = px;
+
+  // RPKI
+  let rk = '';
+  const scoreClass = r.coverage_percent >= 90 ? 'high' : r.coverage_percent >= 70 ? 'mid' : 'low';
+  rk += '<div class="big-score ' + scoreClass + '">' + r.coverage_percent + '%</div>';
+  rk += '<div style="font-size:.8rem;color:var(--muted);margin-bottom:.5rem">RPKI Coverage (' + r.checked + ' prefixes checked)</div>';
+
+  const vpct = pct(r.valid, r.checked);
+  const ipct = pct(r.invalid, r.checked);
+  const npct = 100 - vpct - ipct;
+  rk += '<div class="progress-multi">';
+  rk += '<div style="width:' + vpct + '%;background:var(--green)" title="Valid ' + vpct + '%"></div>';
+  rk += '<div style="width:' + ipct + '%;background:var(--red)" title="Invalid ' + ipct + '%"></div>';
+  rk += '<div style="width:' + npct + '%;background:var(--dim)" title="Not Found ' + npct + '%"></div>';
+  rk += '</div>';
+
+  rk += '<div style="display:flex;gap:1.5rem;margin-top:.5rem;font-size:.8rem">';
+  rk += '<div><span style="color:var(--green);font-weight:600">' + r.valid + '</span> <span style="color:var(--muted)">valid</span></div>';
+  rk += '<div><span style="color:var(--red);font-weight:600">' + r.invalid + '</span> <span style="color:var(--muted)">invalid</span></div>';
+  rk += '<div><span style="color:var(--dim);font-weight:600">' + r.not_found + '</span> <span style="color:var(--muted)">not found</span></div>';
+  rk += '</div>';
+
+  // Expandable per-prefix RPKI details
+  if (r.details && r.details.length > 0) {
+    rk += '<div class="expand-toggle" onclick="toggleExpand(this)">Show per-prefix RPKI details (' + r.details.length + ')</div>';
+    rk += '<div class="expand-body"><div class="scroll-wrap"><table class="tbl"><thead><tr><th>Prefix</th><th>Status</th><th>ROAs</th></tr></thead><tbody>';
+    r.details.forEach(function(rd) {
+      var icon = rpkiIcon(rd.status);
+      var statusText = rd.status === 'valid' ? '<span style="color:var(--green)">Valid</span>' : rd.status === 'invalid' ? '<span style="color:var(--red)">Invalid</span>' : '<span style="color:var(--muted)">Not Found</span>';
+      rk += '<tr><td style="font-family:monospace;font-size:.75rem">' + escHtml(rd.prefix) + '</td>';
+      rk += '<td>' + icon + ' ' + statusText + '</td>';
+      rk += '<td>' + (rd.validating_roas || 0) + '</td></tr>';
+    });
+    rk += '</tbody></table></div></div>';
+  }
+  $('rpkiContent').innerHTML = rk;
+
+  // Neighbours
+  let ne = '<div class="stat-row">';
+  ne += '<div class="stat"><div class="stat-val">' + nb.total + '</div><div class="stat-label">Total</div></div>';
+  ne += '<div class="stat"><div class="stat-val orange">' + nb.upstream_count + '</div><div class="stat-label">Upstreams</div></div>';
+  ne += '<div class="stat"><div class="stat-val cyan">' + nb.peer_count + '</div><div class="stat-label">Peers</div></div>';
+  ne += '<div class="stat"><div class="stat-val blue">' + nb.downstream_count + '</div><div class="stat-label">Downstreams</div></div>';
+  ne += '</div>';
+
+  ne += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">';
+
+  ne += '<div><div style="font-size:.75rem;font-weight:600;color:var(--orange);margin-bottom:.4rem">Top Upstreams</div>';
+  ne += '<div class="scroll-wrap"><table class="tbl"><thead><tr><th>ASN</th><th>Name</th><th>Power</th></tr></thead><tbody>';
+  (nb.upstreams || []).slice(0, 10).forEach(function(u) {
+    ne += '<tr><td>' + asnLink(u.asn) + '</td><td>' + escHtml(u.name) + '</td><td>' + (u.power || '-') + '</td></tr>';
+  });
+  ne += '</tbody></table></div></div>';
+
+  ne += '<div><div style="font-size:.75rem;font-weight:600;color:var(--cyan);margin-bottom:.4rem">Top Peers</div>';
+  ne += '<div class="scroll-wrap"><table class="tbl"><thead><tr><th>ASN</th><th>Name</th><th>Power</th></tr></thead><tbody>';
+  (nb.peers || []).slice(0, 10).forEach(function(u) {
+    ne += '<tr><td>' + asnLink(u.asn) + '</td><td>' + escHtml(u.name) + '</td><td>' + (u.power || '-') + '</td></tr>';
+  });
+  ne += '</tbody></table></div></div>';
+
+  ne += '</div>';
+  $('neighbourContent').innerHTML = ne;
+
+  // IX Presence
+  let ixh = '<div class="stat-row">';
+  ixh += '<div class="stat"><div class="stat-val green">' + ix.total_connections + '</div><div class="stat-label">Connections</div></div>';
+  ixh += '<div class="stat"><div class="stat-val purple">' + ix.unique_ixps + '</div><div class="stat-label">Unique IXPs</div></div>';
+  ixh += '</div>';
+
+  if (ix.connections && ix.connections.length > 0) {
+    ixh += '<div class="scroll-wrap"><table class="tbl"><thead><tr><th>IX Name</th><th>Speed</th><th>IPv4</th><th>IPv6</th></tr></thead><tbody>';
+    ix.connections.forEach(function(c) {
+      const ixUrl = c.ix_id ? 'https://www.peeringdb.com/ix/' + c.ix_id : '#';
+      ixh += '<tr><td><a href="' + ixUrl + '" target="_blank">' + escHtml(c.ix_name) + '</a></td>';
+      ixh += '<td>' + fmtSpeed(c.speed_mbps) + '</td>';
+      ixh += '<td style="font-family:monospace;font-size:.75rem">' + (c.ipv4 || '-') + '</td>';
+      ixh += '<td style="font-family:monospace;font-size:.75rem">' + (c.ipv6 || '-') + '</td></tr>';
+    });
+    ixh += '</tbody></table></div>';
+  }
+  $('ixContent').innerHTML = ixh;
+
+  // Facilities
+  let fh = '<div class="stat-row"><div class="stat"><div class="stat-val blue">' + fac.total + '</div><div class="stat-label">Facilities</div></div></div>';
+  if (fac.list && fac.list.length > 0) {
+    fh += '<div class="scroll-wrap"><table class="tbl"><thead><tr><th>Facility</th><th>City</th><th>Country</th></tr></thead><tbody>';
+    fac.list.forEach(function(f) {
+      const fUrl = f.fac_id ? 'https://www.peeringdb.com/fac/' + f.fac_id : '#';
+      fh += '<tr><td><a href="' + fUrl + '" target="_blank">' + escHtml(f.name) + '</a></td>';
+      fh += '<td>' + escHtml(f.city) + '</td>';
+      fh += '<td>' + countryFlag(f.country) + ' ' + escHtml(f.country) + '</td></tr>';
+    });
+    fh += '</tbody></table></div>';
+  }
+  $('facContent').innerHTML = fh;
+}
+
+async function doCompare() {
+  if (!currentAsn) return;
+  const raw2 = $('compareAsn').value.trim().replace(/[^0-9]/g, '');
+  if (!raw2) return;
+
+  $('compareResults').innerHTML = '<div class="skeleton wide"></div><div class="skeleton med"></div>';
+
+  try {
+    const resp = await fetch('/api/compare?asn1=' + currentAsn + '&asn2=' + raw2);
+    const d = await resp.json();
+
+    let h = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem">';
+    h += '<div style="text-align:center"><div class="stat-val blue">' + escHtml(d.asn1.name) + '</div><div class="stat-label">AS' + d.asn1.asn + ' (' + d.asn1.ix_count + ' IXPs)</div></div>';
+    h += '<div style="text-align:center"><div class="stat-val purple">' + escHtml(d.asn2.name) + '</div><div class="stat-label">AS' + d.asn2.asn + ' (' + d.asn2.ix_count + ' IXPs)</div></div>';
+    h += '</div>';
+
+    // RPKI comparison
+    if (d.rpki_comparison) {
+      h += '<div style="font-size:.8rem;font-weight:600;color:var(--purple);margin:.75rem 0 .4rem">RPKI Coverage Comparison</div>';
+      h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:.75rem">';
+
+      var s1class = d.rpki_comparison.asn1_coverage >= 90 ? 'green' : d.rpki_comparison.asn1_coverage >= 70 ? 'orange' : 'red';
+      var s2class = d.rpki_comparison.asn2_coverage >= 90 ? 'green' : d.rpki_comparison.asn2_coverage >= 70 ? 'orange' : 'red';
+      h += '<div style="text-align:center"><div style="font-size:2rem;font-weight:700;color:var(--' + s1class + ')">' + d.rpki_comparison.asn1_coverage + '%</div><div style="font-size:.7rem;color:var(--muted)">AS' + d.asn1.asn + ' (' + d.rpki_comparison.asn1_checked + ' checked)</div></div>';
+      h += '<div style="text-align:center"><div style="font-size:2rem;font-weight:700;color:var(--' + s2class + ')">' + d.rpki_comparison.asn2_coverage + '%</div><div style="font-size:.7rem;color:var(--muted)">AS' + d.asn2.asn + ' (' + d.rpki_comparison.asn2_checked + ' checked)</div></div>';
+      h += '</div>';
+      if (d.rpki_comparison.better !== 'equal') {
+        h += '<div style="text-align:center;font-size:.8rem;color:var(--green);margin-bottom:.5rem">' + escHtml(d.rpki_comparison.better) + ' has better RPKI coverage</div>';
+      }
+    }
+
+    // Common upstreams
+    if (d.common_upstreams && d.common_upstreams.length > 0) {
+      h += '<div style="font-size:.8rem;font-weight:600;color:var(--yellow);margin:.5rem 0">Common Upstreams (' + d.common_upstreams.length + ')</div>';
+      h += '<div style="display:flex;flex-wrap:wrap;gap:.3rem;margin-bottom:.5rem">';
+      d.common_upstreams.forEach(function(u) { h += '<span class="badge badge-orange">' + asnLink(u.asn) + ' ' + escHtml(u.name) + '</span>'; });
+      h += '</div>';
+    } else if (d.common_upstreams) {
+      h += '<div style="font-size:.8rem;color:var(--muted);margin:.5rem 0">No common upstreams detected</div>';
+    }
+
+    h += '<div style="font-size:.8rem;font-weight:600;color:var(--green);margin:.5rem 0">Common IXPs (' + d.common_ixps.length + ')</div>';
+    if (d.common_ixps.length > 0) {
+      h += '<div style="display:flex;flex-wrap:wrap;gap:.3rem">';
+      d.common_ixps.forEach(function(ix) { h += '<span class="badge badge-green">' + escHtml(ix.name) + '</span>'; });
+      h += '</div>';
+    } else {
+      h += '<div style="font-size:.8rem;color:var(--muted)">No common IXPs</div>';
+    }
+
+    h += '<div style="font-size:.8rem;font-weight:600;color:var(--orange);margin:.5rem 0">Only AS' + d.asn1.asn + ' (' + d.only_asn1_ixps.length + ')</div>';
+    if (d.only_asn1_ixps.length > 0) {
+      h += '<div style="display:flex;flex-wrap:wrap;gap:.3rem">';
+      d.only_asn1_ixps.slice(0, 15).forEach(function(ix) { h += '<span class="badge badge-orange">' + escHtml(ix.name) + '</span>'; });
+      if (d.only_asn1_ixps.length > 15) h += '<span class="badge badge-orange">+' + (d.only_asn1_ixps.length - 15) + ' more</span>';
+      h += '</div>';
+    }
+
+    h += '<div style="font-size:.8rem;font-weight:600;color:var(--blue);margin:.5rem 0">Only AS' + d.asn2.asn + ' (' + d.only_asn2_ixps.length + ')</div>';
+    if (d.only_asn2_ixps.length > 0) {
+      h += '<div style="display:flex;flex-wrap:wrap;gap:.3rem">';
+      d.only_asn2_ixps.slice(0, 15).forEach(function(ix) { h += '<span class="badge badge-blue">' + escHtml(ix.name) + '</span>'; });
+      if (d.only_asn2_ixps.length > 15) h += '<span class="badge badge-blue">+' + (d.only_asn2_ixps.length - 15) + ' more</span>';
+      h += '</div>';
+    }
+
+    if (d.common_facilities && d.common_facilities.length > 0) {
+      h += '<div style="font-size:.8rem;font-weight:600;color:var(--cyan);margin:.5rem 0">Common Facilities (' + d.common_facilities.length + ')</div>';
+      h += '<div style="display:flex;flex-wrap:wrap;gap:.3rem">';
+      d.common_facilities.forEach(function(f) { h += '<span class="badge badge-cyan">' + escHtml(f.name) + '</span>'; });
+      h += '</div>';
+    }
+
+    h += '<div style="font-size:.7rem;color:var(--dim);margin-top:.5rem">Compared in ' + d.meta.duration_ms + 'ms</div>';
+    $('compareResults').innerHTML = h;
+  } catch (e) {
+    $('compareResults').innerHTML = '<div style="color:var(--red);font-size:.8rem">Compare failed: ' + escHtml(e.message) + '</div>';
+  }
+}
+
+function toggleExpand(el) {
+  const body = el.nextElementSibling;
+  const isOpen = body.classList.contains('open');
+  body.classList.toggle('open');
+  el.textContent = isOpen ? el.textContent.replace('Hide', 'Show') : el.textContent.replace('Show', 'Hide');
+}
+
+function escHtml(s) {
+  if (!s) return '';
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+function escAttr(s) {
+  return escHtml(s);
+}
+
+$('asnInput').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') doLookup();
+});
+
+(function() {
+  const params = new URLSearchParams(window.location.search);
+  const asn = params.get('asn');
+  if (asn) {
+    $('asnInput').value = asn;
+    doLookup();
+  }
+})();
+</script>
+</body>
+</html>
