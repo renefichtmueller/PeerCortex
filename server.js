@@ -1694,37 +1694,32 @@ const server = http.createServer(async (req, res) => {
       return res.end(JSON.stringify({ error: "Need asn1 and asn2 parameters" }));
     }
 
+    const compareCacheKey = "compare:" + asn1 + ":" + asn2;
+    const compareCached = cacheGet(compareCacheKey);
+    if (compareCached) {
+      res.writeHead(200, { "Content-Type": "application/json", "X-Cache": "HIT" });
+      return res.end(JSON.stringify(compareCached));
+    }
     const start = Date.now();
     try {
-      const [pdb1, pdb2, nb1Data, nb2Data, pfx1Data, pfx2Data] = await Promise.all([
+      // ALL calls in parallel — single batch
+      const [pdb1, pdb2, nb1Data, nb2Data, pfx1Data, pfx2Data, ix1Data, ix2Data, fac1Data, fac2Data] = await Promise.all([
         fetchJSON("https://www.peeringdb.com/api/net?asn=" + asn1),
         fetchJSON("https://www.peeringdb.com/api/net?asn=" + asn2),
         fetchJSON("https://stat.ripe.net/data/asn-neighbours/data.json?resource=AS" + asn1),
         fetchJSON("https://stat.ripe.net/data/asn-neighbours/data.json?resource=AS" + asn2),
         fetchJSON("https://stat.ripe.net/data/announced-prefixes/data.json?resource=AS" + asn1),
         fetchJSON("https://stat.ripe.net/data/announced-prefixes/data.json?resource=AS" + asn2),
+        fetchJSON("https://www.peeringdb.com/api/netixlan?asn=" + asn1),
+        fetchJSON("https://www.peeringdb.com/api/netixlan?asn=" + asn2),
+        fetchJSON("https://www.peeringdb.com/api/netfac?asn=" + asn1),
+        fetchJSON("https://www.peeringdb.com/api/netfac?asn=" + asn2),
       ]);
 
       const net1 = pdb1?.data?.[0] || {};
       const net2 = pdb2?.data?.[0] || {};
 
-      const ixFacPromises = [];
-      if (net1.id) {
-        ixFacPromises.push(fetchJSON("https://www.peeringdb.com/api/netixlan?net_id=" + net1.id));
-        ixFacPromises.push(fetchJSON("https://www.peeringdb.com/api/netfac?net_id=" + net1.id));
-      } else {
-        ixFacPromises.push(Promise.resolve(null));
-        ixFacPromises.push(Promise.resolve(null));
-      }
-      if (net2.id) {
-        ixFacPromises.push(fetchJSON("https://www.peeringdb.com/api/netixlan?net_id=" + net2.id));
-        ixFacPromises.push(fetchJSON("https://www.peeringdb.com/api/netfac?net_id=" + net2.id));
-      } else {
-        ixFacPromises.push(Promise.resolve(null));
-        ixFacPromises.push(Promise.resolve(null));
-      }
-
-      const [ix1Data, fac1Data, ix2Data, fac2Data] = await Promise.all(ixFacPromises);
+      // IX + Facility data already fetched in parallel above
 
       const ix1Set = new Set((ix1Data?.data || []).map((ix) => ix.ix_id));
       const ix2Set = new Set((ix2Data?.data || []).map((ix) => ix.ix_id));
@@ -1759,14 +1754,20 @@ const server = http.createServer(async (req, res) => {
         .filter((a) => up2Set.has(a))
         .map((a) => ({ asn: a, name: nb1Map[a] || nb2Map[a] || "" }));
 
-      await resolveASNames(commonUpstreams);
-
-      const pfx1 = (pfx1Data?.data?.prefixes || []).slice(0, 10).map((p) => p.prefix);
-      const pfx2 = (pfx2Data?.data?.prefixes || []).slice(0, 10).map((p) => p.prefix);
-
-      const [rpki1Results, rpki2Results] = await Promise.all([
-        Promise.all(pfx1.map((p) => fetchRPKIPerPrefix(asn1, p))),
-        Promise.all(pfx2.map((p) => fetchRPKIPerPrefix(asn2, p))),
+      // Resolve names + RPKI sample (max 3+3 prefixes) all in parallel with 5s timeout
+      const pfx1 = (pfx1Data?.data?.prefixes || []).slice(0, 3).map((p) => p.prefix);
+      const pfx2 = (pfx2Data?.data?.prefixes || []).slice(0, 3).map((p) => p.prefix);
+      const [, rpki1Results, rpki2Results] = await Promise.race([
+        Promise.all([
+          commonUpstreams.length > 0 ? Promise.all(commonUpstreams.map(n =>
+            fetchJSON("https://stat.ripe.net/data/as-overview/data.json?resource=AS" + n.asn, { timeout: 3000 })
+              .then(r => { if (r?.data?.holder) n.name = r.data.holder; })
+              .catch(() => {})
+          )) : Promise.resolve([]),
+          Promise.all(pfx1.map((p) => fetchRPKIPerPrefix(asn1, p))),
+          Promise.all(pfx2.map((p) => fetchRPKIPerPrefix(asn2, p))),
+        ]),
+        new Promise(r => setTimeout(() => r([[], [], []]), 5000)),
       ]);
 
       const rpki1Valid = rpki1Results.filter((r) => r.status === "valid").length;
@@ -1775,9 +1776,7 @@ const server = http.createServer(async (req, res) => {
       const rpki2Pct = rpki2Results.length > 0 ? Math.round((rpki2Valid / rpki2Results.length) * 100) : 0;
 
       const duration = Date.now() - start;
-      res.end(
-        JSON.stringify(
-          {
+      const compareResult = {
             meta: { duration_ms: duration, timestamp: new Date().toISOString() },
             asn1: {
               asn: parseInt(asn1),
@@ -1807,11 +1806,9 @@ const server = http.createServer(async (req, res) => {
               asn2_checked: rpki2Results.length,
               better: rpki1Pct > rpki2Pct ? "AS" + asn1 : rpki2Pct > rpki1Pct ? "AS" + asn2 : "equal",
             },
-          },
-          null,
-          2
-        )
-      );
+          };
+      cacheSet(compareCacheKey, compareResult, CACHE_TTL_DEFAULT);
+      res.end(JSON.stringify(compareResult, null, 2));
     } catch (err) {
       res.writeHead(500);
       res.end(JSON.stringify({ error: "Compare failed", message: err.message }));
