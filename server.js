@@ -92,6 +92,24 @@ function fetchRPKIPerPrefix(asn, prefix) {
   });
 }
 
+
+async function resolveASNames(asnList) {
+  const names = {};
+  const batchSize = 10;
+  for (let i = 0; i < asnList.length; i += batchSize) {
+    const batch = asnList.slice(i, i + batchSize);
+    const results = await Promise.all(
+      batch.map((asn) =>
+        fetchJSON("https://stat.ripe.net/data/as-overview/data.json?resource=AS" + asn)
+          .then((r) => ({ asn, name: r?.data?.holder || "" }))
+          .catch(() => ({ asn, name: "" }))
+      )
+    );
+    results.forEach((r) => { names[r.asn] = r.name; });
+  }
+  return names;
+}
+
 const server = http.createServer(async (req, res) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
@@ -180,10 +198,18 @@ const server = http.createServer(async (req, res) => {
       const leftNeighbours = neighbours.filter((n) => n.type === "left");
       leftNeighbours.forEach((n) => upstreamSet.add(n.asn));
 
-      const detectedProviders = [...upstreamSet].map((asn) => {
+      let detectedProviders = [...upstreamSet].map((asn) => {
         const nb = leftNeighbours.find((n) => n.asn === asn);
         return { asn, name: nb && nb.as_name ? nb.as_name : "" };
       });
+
+      // Batch-resolve AS names from RIPE Stat AS overview API
+      const providerASNs = detectedProviders.map((p) => p.asn);
+      const resolvedNames = await resolveASNames(providerASNs);
+      detectedProviders = detectedProviders.map((p) => ({
+        ...p,
+        name: resolvedNames[p.asn] || p.name || "",
+      }));
 
       // Check RIPE DB for ASPA references
       let aspaObjectExists = false;
@@ -216,7 +242,7 @@ const server = http.createServer(async (req, res) => {
         "# AFI:          ipv4, ipv6\n" +
         "#\n" +
         "# Detected providers from BGP path analysis:\n" +
-        detectedProviders.map((p) => "#   AS" + p.asn + " (" + p.name + ")").join("\n");
+        detectedProviders.map((p) => "#   AS" + p.asn + (p.name ? " (" + p.name + ")" : "")).join("\n");
 
       // Sample path analysis
       const samplePaths = asPaths.slice(0, 10).map((p) => {
@@ -451,17 +477,21 @@ const server = http.createServer(async (req, res) => {
       const rpkiTotal = rpkiStatuses.length;
       const rpkiCoverage = rpkiTotal > 0 ? Math.round((rpkiValid / rpkiTotal) * 100) : 0;
 
+      // Resolve AS names for neighbours that have empty as_name
+      const neighboursNeedingNames = neighbours.filter((n) => !n.as_name).map((n) => n.asn);
+      const neighbourNames = neighboursNeedingNames.length > 0 ? await resolveASNames(neighboursNeedingNames) : {};
+
       const upstreams = neighbours
         .filter((n) => n.type === "left")
-        .map((n) => ({ asn: n.asn, name: n.as_name || "AS" + n.asn, power: n.power || 0 }))
+        .map((n) => ({ asn: n.asn, name: n.as_name || neighbourNames[n.asn] || "", power: n.power || 0 }))
         .sort((a, b) => b.power - a.power);
       const downstreams = neighbours
         .filter((n) => n.type === "right")
-        .map((n) => ({ asn: n.asn, name: n.as_name || "AS" + n.asn, power: n.power || 0 }))
+        .map((n) => ({ asn: n.asn, name: n.as_name || neighbourNames[n.asn] || "", power: n.power || 0 }))
         .sort((a, b) => b.power - a.power);
       const peers = neighbours
         .filter((n) => n.type === "uncertain" || n.type === "peer")
-        .map((n) => ({ asn: n.asn, name: n.as_name || "AS" + n.asn, power: n.power || 0 }))
+        .map((n) => ({ asn: n.asn, name: n.as_name || neighbourNames[n.asn] || "", power: n.power || 0 }))
         .sort((a, b) => b.power - a.power);
 
       let rir = "";
