@@ -143,7 +143,7 @@ function checkRateLimit(ip) {
 }
 
 function fetchJSON(url, options) {
-  const timeoutMs = (options && options.timeout) || 8000;
+  const timeoutMs = (options && options.timeout) || 20000;
   return new Promise((resolve) => {
     const reqOptions = {
       headers: { "User-Agent": UA, ...(options && options.headers ? options.headers : {}) },
@@ -1160,9 +1160,9 @@ const server = http.createServer(async (req, res) => {
     try {
       // Phase 1: Fetch core data needed by multiple validations
       const [prefixData, pdbNet, neighbourData, overviewData] = await Promise.all([
-        fetchJSON("https://stat.ripe.net/data/announced-prefixes/data.json?resource=AS" + rawAsn),
+        fetchJSON("https://stat.ripe.net/data/announced-prefixes/data.json?resource=AS" + rawAsn, { timeout: 30000 }),
         fetchJSON("https://www.peeringdb.com/api/net?asn=" + rawAsn),
-        fetchJSON("https://stat.ripe.net/data/asn-neighbours/data.json?resource=AS" + rawAsn),
+        fetchJSON("https://stat.ripe.net/data/asn-neighbours/data.json?resource=AS" + rawAsn, { timeout: 30000 }),
         fetchJSON("https://stat.ripe.net/data/as-overview/data.json?resource=AS" + rawAsn),
       ]);
 
@@ -1497,41 +1497,38 @@ const server = http.createServer(async (req, res) => {
     const start = Date.now();
 
     try {
-      // ALL calls in parallel — single phase, no sequential waits
-      const [pdbNet, prefixData, neighbourData, overviewData, rirData, atlasProbeData, bgpHeData, visibilityData, prefixSizeData, pdbIxlan, pdbFac] = await Promise.all([
-        fetchJSON("https://www.peeringdb.com/api/net?asn=" + asn),
-        fetchJSON("https://stat.ripe.net/data/announced-prefixes/data.json?resource=AS" + asn),
-        fetchJSON("https://stat.ripe.net/data/asn-neighbours/data.json?resource=AS" + asn),
+      // Phase 0: Get PDB net first (fast, <1s) to get net_id for IX/Fac queries
+      const pdbNet = await fetchJSON("https://www.peeringdb.com/api/net?asn=" + asn);
+      const net = pdbNet?.data?.[0] || {};
+      const netId = net.id;
+
+      // Phase 1: ALL calls in parallel — RIPE Stat + PDB IX/Fac + Atlas + bgp.he.net
+      const promises = [
+        fetchJSON("https://stat.ripe.net/data/announced-prefixes/data.json?resource=AS" + asn, { timeout: 30000 }),
+        fetchJSON("https://stat.ripe.net/data/asn-neighbours/data.json?resource=AS" + asn, { timeout: 30000 }),
         fetchJSON("https://stat.ripe.net/data/as-overview/data.json?resource=AS" + asn),
         fetchJSON("https://stat.ripe.net/data/rir-stats-country/data.json?resource=AS" + asn),
         fetchJSON("https://atlas.ripe.net/api/v2/probes/?asn_v4=" + asn + "&page_size=500"),
         fetchBgpHeNet(asn),
-        fetchJSON("https://stat.ripe.net/data/visibility/data.json?resource=AS" + asn),
+        fetchJSON("https://stat.ripe.net/data/visibility/data.json?resource=AS" + asn, { timeout: 30000 }),
         fetchJSON("https://stat.ripe.net/data/prefix-size-distribution/data.json?resource=AS" + asn),
-        fetchJSON("https://www.peeringdb.com/api/netixlan?asn=" + asn),
-        fetchJSON("https://www.peeringdb.com/api/netfac?asn=" + asn),
-      ]);
+        netId ? fetchJSON("https://www.peeringdb.com/api/netixlan?net_id=" + netId) : Promise.resolve(null),
+        netId ? fetchJSON("https://www.peeringdb.com/api/netfac?net_id=" + netId) : Promise.resolve(null),
+      ];
+      const [prefixData, neighbourData, overviewData, rirData, atlasProbeData, bgpHeData, visibilityData, prefixSizeData, ixlanData, facData] = await Promise.all(promises);
 
-      const net = pdbNet?.data?.[0] || {};
-      const netId = net.id;
       const prefixes = prefixData?.data?.prefixes || [];
       const neighbours = neighbourData?.data?.neighbours || [];
       const overview = overviewData?.data || {};
       const rirEntries = rirData?.data?.located_resources || rirData?.data?.rir_stats || [];
 
+      // Bug 6 fix: Atlas probe status uses status.name (object), not status_name (flat)
       const atlasProbes = atlasProbeData?.results || [];
-      const atlasConnected = atlasProbes.filter(p => p.status_name === "Connected");
+      const atlasConnected = atlasProbes.filter(p => {
+        const sName = (p.status_name || (p.status && p.status.name) || "").toLowerCase();
+        return sName === "connected";
+      });
       const atlasAnchors = atlasProbes.filter(p => p.is_anchor === true);
-
-      // Use direct ASN query results, fallback to netId query if empty
-      let ixlanData = pdbIxlan;
-      let facData = pdbFac;
-      if ((!ixlanData?.data || ixlanData.data.length === 0) && netId) {
-        [ixlanData, facData] = await Promise.all([
-          fetchJSON("https://www.peeringdb.com/api/netixlan?net_id=" + netId),
-          fetchJSON("https://www.peeringdb.com/api/netfac?net_id=" + netId),
-        ]);
-      }
 
       // RPKI: sample max 5+5 prefixes (v4+v6) in parallel
       const allPrefixes = prefixes.map((p) => p.prefix);
@@ -1612,8 +1609,10 @@ const server = http.createServer(async (req, res) => {
 
         // Visibility API returns per-RIS-collector data
         // Each collector has ipv4_full_table_peer_count and ipv4_full_table_peers_not_seeing[]
+        // Bug 3 fix: visibility API may timeout for large ASNs — handle gracefully
         var visibilities = (visibilityData && visibilityData.data && visibilityData.data.visibilities) || [];
         var v4Seeing = 0, v4Total = 0, v6Seeing = 0, v6Total = 0;
+        var visTimedOut = !visibilityData || !visibilityData.data;
         visibilities.forEach(function(v) {
           if (!v || !v.probe) return;
           var v4PeerCount = v.ipv4_full_table_peer_count || 0;
@@ -1627,6 +1626,11 @@ const server = http.createServer(async (req, res) => {
         });
         if (v4Total > 0) ipv4VisAvg = Math.round((v4Seeing / v4Total) * 1000) / 10;
         if (v6Total > 0) ipv6VisAvg = Math.round((v6Seeing / v6Total) * 1000) / 10;
+        // If visibility API timed out but we have prefixes, mark as -1 (= "data unavailable")
+        if (visTimedOut && prefixes.length > 0) {
+          ipv4VisAvg = -1;
+          ipv6VisAvg = -1;
+        }
         totalRisPeersV4 = v4Total;
         totalRisPeersV6 = v6Total;
 
@@ -1756,23 +1760,28 @@ const server = http.createServer(async (req, res) => {
     const start = Date.now();
     try {
       // ALL calls in parallel — single batch
-      const [pdb1, pdb2, nb1Data, nb2Data, pfx1Data, pfx2Data, ix1Data, ix2Data, fac1Data, fac2Data] = await Promise.all([
+      // Phase 1: Get PDB net objects + RIPE data
+      const [pdb1, pdb2, nb1Data, nb2Data, pfx1Data, pfx2Data] = await Promise.all([
         fetchJSON("https://www.peeringdb.com/api/net?asn=" + asn1),
         fetchJSON("https://www.peeringdb.com/api/net?asn=" + asn2),
-        fetchJSON("https://stat.ripe.net/data/asn-neighbours/data.json?resource=AS" + asn1),
-        fetchJSON("https://stat.ripe.net/data/asn-neighbours/data.json?resource=AS" + asn2),
-        fetchJSON("https://stat.ripe.net/data/announced-prefixes/data.json?resource=AS" + asn1),
-        fetchJSON("https://stat.ripe.net/data/announced-prefixes/data.json?resource=AS" + asn2),
-        fetchJSON("https://www.peeringdb.com/api/netixlan?asn=" + asn1),
-        fetchJSON("https://www.peeringdb.com/api/netixlan?asn=" + asn2),
-        fetchJSON("https://www.peeringdb.com/api/netfac?asn=" + asn1),
-        fetchJSON("https://www.peeringdb.com/api/netfac?asn=" + asn2),
+        fetchJSON("https://stat.ripe.net/data/asn-neighbours/data.json?resource=AS" + asn1, { timeout: 30000 }),
+        fetchJSON("https://stat.ripe.net/data/asn-neighbours/data.json?resource=AS" + asn2, { timeout: 30000 }),
+        fetchJSON("https://stat.ripe.net/data/announced-prefixes/data.json?resource=AS" + asn1, { timeout: 30000 }),
+        fetchJSON("https://stat.ripe.net/data/announced-prefixes/data.json?resource=AS" + asn2, { timeout: 30000 }),
       ]);
 
       const net1 = pdb1?.data?.[0] || {};
       const net2 = pdb2?.data?.[0] || {};
+      const netId1 = net1.id;
+      const netId2 = net2.id;
 
-      // IX + Facility data already fetched in parallel above
+      // Phase 2: IX + Facility using net_id (Bug 1 fix: netfac requires net_id, not asn)
+      const ixFacPromises = [];
+      ixFacPromises.push(netId1 ? fetchJSON("https://www.peeringdb.com/api/netixlan?net_id=" + netId1) : Promise.resolve(null));
+      ixFacPromises.push(netId2 ? fetchJSON("https://www.peeringdb.com/api/netixlan?net_id=" + netId2) : Promise.resolve(null));
+      ixFacPromises.push(netId1 ? fetchJSON("https://www.peeringdb.com/api/netfac?net_id=" + netId1) : Promise.resolve(null));
+      ixFacPromises.push(netId2 ? fetchJSON("https://www.peeringdb.com/api/netfac?net_id=" + netId2) : Promise.resolve(null));
+      const [ix1Data, ix2Data, fac1Data, fac2Data] = await Promise.all(ixFacPromises);
 
       const ix1Set = new Set((ix1Data?.data || []).map((ix) => ix.ix_id));
       const ix2Set = new Set((ix2Data?.data || []).map((ix) => ix.ix_id));
