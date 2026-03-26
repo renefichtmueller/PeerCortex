@@ -49,16 +49,16 @@
     "route-views",
     "bgp-anomaly"
   ],
-  "author": "PeerCortex Contributors",
+  "author": "Rene Fichtmueller",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/peercortex/peercortex.git"
+    "url": "https://github.com/renefichtmueller/PeerCortex.git"
   },
   "bugs": {
-    "url": "https://github.com/peercortex/peercortex/issues"
+    "url": "https://github.com/renefichtmueller/PeerCortex/issues"
   },
-  "homepage": "https://github.com/peercortex/peercortex#readme",
+  "homepage": "https://peercortex.org",
   "engines": {
     "node": ">=20.0.0"
   },
