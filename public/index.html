@@ -100,7 +100,19 @@ a{color:var(--blue);text-decoration:none;transition:color .2s}a:hover{color:var(
 @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
 .skeleton.h2{height:2rem;width:60%}.skeleton.h3{height:1.2rem;width:40%}.skeleton.wide{width:100%}.skeleton.med{width:70%}
 
-.meta-bar{text-align:center;font-size:.75rem;color:var(--dim);margin-top:1rem;padding:0 1.5rem}
+.meta-bar{text-align:center;font-size:.75rem;color:var(--dim);margin-top:1rem;padding:0 1.5rem;display:flex;align-items:center;justify-content:center;gap:.75rem;flex-wrap:wrap}
+.dq-badge{display:inline-flex;align-items:center;gap:.35rem;padding:.25rem .65rem;border-radius:6px;font-size:.7rem;font-weight:600;cursor:help;position:relative;transition:all .2s}
+.dq-badge.high{background:rgba(158,206,106,.15);color:var(--green);border:1px solid rgba(158,206,106,.3)}
+.dq-badge.medium{background:rgba(255,158,100,.15);color:var(--orange);border:1px solid rgba(255,158,100,.3)}
+.dq-badge.low{background:rgba(247,118,142,.15);color:var(--red);border:1px solid rgba(247,118,142,.3)}
+.dq-badge svg{width:12px;height:12px}
+.dq-tooltip{display:none;position:absolute;bottom:calc(100% + 8px);left:50%;transform:translateX(-50%);background:var(--card);border:1px solid var(--border-light);border-radius:8px;padding:.75rem;font-size:.7rem;font-weight:400;color:var(--text-dim);min-width:280px;max-width:360px;z-index:100;box-shadow:0 4px 12px rgba(0,0,0,.3);text-align:left;line-height:1.5}
+.dq-badge:hover .dq-tooltip{display:block}
+.dq-tooltip-row{display:flex;justify-content:space-between;padding:.2rem 0;border-bottom:1px solid rgba(42,43,61,.5)}
+.dq-tooltip-row:last-child{border-bottom:none}
+.dq-tooltip-label{color:var(--muted)}
+.dq-tooltip-value{font-weight:600}
+.dq-tooltip-value.agree{color:var(--green)}.dq-tooltip-value.warn{color:var(--orange)}.dq-tooltip-value.bad{color:var(--red)}.dq-tooltip-value.na{color:var(--dim)}
 
 .footer{text-align:center;padding:2rem 1.5rem;color:var(--dim);font-size:.75rem;border-top:1px solid var(--border);margin-top:2rem}
 .footer a{color:var(--muted)}
@@ -267,7 +279,7 @@ a{color:var(--blue);text-decoration:none;transition:color .2s}a:hover{color:var(
       <line x1="18" y1="13" x2="25" y2="22" stroke="#565f89" stroke-width="1.5"/>
       <line x1="13" y1="24" x2="23" y2="24" stroke="#565f89" stroke-width="1.5"/>
     </svg>
-    <div><h1>PeerCortex</h1><span>Network Intelligence Dashboard v0.3</span></div>
+    <div><h1>PeerCortex <span style="font-size:.45em;background:linear-gradient(135deg,#f59e0b,#ef4444);color:#fff;padding:2px 10px;border-radius:4px;vertical-align:middle;letter-spacing:.08em;font-weight:700">BETA</span></h1><span>Network Intelligence Dashboard v0.5.0-beta</span></div>
   </div>
   <nav class="quick-links">
     <a href="https://github.com/peercortex/peercortex" target="_blank">GitHub</a>
@@ -667,6 +679,129 @@ function renderAuditList(containerId, list, sortBy, type) {
   document.getElementById(containerId).innerHTML = h;
 }
 
+function renderMetaBar(d) {
+  var bar = $('metaBar');
+  // Clear previous content
+  while (bar.firstChild) bar.removeChild(bar.firstChild);
+
+  // Meta text span
+  var metaSpan = document.createElement('span');
+  metaSpan.textContent = 'Query: ' + d.meta.query + ' | Duration: ' + d.meta.duration_ms + 'ms | RPKI checked: ' + d.meta.rpki_prefixes_checked + '/' + d.meta.total_prefixes + ' prefixes | ' + d.meta.timestamp;
+  bar.appendChild(metaSpan);
+
+  // Data Quality badge
+  var dq = d.data_quality;
+  if (dq) {
+    var conf = dq.overall_confidence || 'high';
+    var badge = document.createElement('span');
+    badge.className = 'dq-badge ' + conf;
+
+    // Shield icon
+    var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('viewBox', '0 0 24 24');
+    svg.setAttribute('fill', 'none');
+    svg.setAttribute('stroke', 'currentColor');
+    svg.setAttribute('stroke-width', '2');
+    var path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('d', 'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z');
+    svg.appendChild(path);
+    badge.appendChild(svg);
+
+    var label = document.createElement('span');
+    var confLabel = conf === 'high' ? 'High Confidence' : conf === 'medium' ? 'Medium Confidence' : 'Low Confidence';
+    label.textContent = confLabel;
+    badge.appendChild(label);
+
+    // Tooltip
+    var tooltip = document.createElement('div');
+    tooltip.className = 'dq-tooltip';
+
+    var title = document.createElement('div');
+    title.style.cssText = 'font-weight:600;color:var(--white);margin-bottom:.5rem;font-size:.75rem';
+    title.textContent = 'Data Quality Report';
+    tooltip.appendChild(title);
+
+    var sources = document.createElement('div');
+    sources.style.cssText = 'margin-bottom:.5rem;color:var(--dim);font-size:.65rem';
+    sources.textContent = 'Sources Queried: ' + (dq.sources_queried || []).join(', ');
+    tooltip.appendChild(sources);
+
+    // Cross-Checks header
+    var checksHeader = document.createElement('div');
+    checksHeader.style.cssText = 'font-weight:600;color:var(--white);margin-bottom:.3rem;margin-top:.3rem;font-size:.7rem';
+    checksHeader.textContent = 'Cross-Checks';
+    tooltip.appendChild(checksHeader);
+
+    var checks = dq.cross_checks || {};
+    var checkNames = [['rpki', 'RPKI Validation'], ['prefixes', 'Prefix Count'], ['neighbours', 'Neighbours']];
+    var totalAgreement = 0;
+    var totalChecks = 0;
+    for (var ci = 0; ci < checkNames.length; ci++) {
+      var key = checkNames[ci][0];
+      var name = checkNames[ci][1];
+      var check = checks[key] || {};
+      var row = document.createElement('div');
+      row.className = 'dq-tooltip-row';
+
+      var rowLabel = document.createElement('span');
+      rowLabel.className = 'dq-tooltip-label';
+      rowLabel.textContent = name + ' (' + (check.sources || 0) + ' sources)';
+      row.appendChild(rowLabel);
+
+      var rowVal = document.createElement('span');
+      var pct = check.agreement_pct;
+      if (pct == null) {
+        rowVal.className = 'dq-tooltip-value na';
+        rowVal.textContent = 'N/A';
+      } else {
+        rowVal.className = 'dq-tooltip-value ' + (pct > 90 ? 'agree' : pct >= 70 ? 'warn' : 'bad');
+        rowVal.textContent = 'Agreement: ' + pct + '%';
+        totalAgreement += pct;
+        totalChecks++;
+      }
+      row.appendChild(rowVal);
+      tooltip.appendChild(row);
+    }
+
+    // Disagreements Found detail
+    var rpkiCheck = checks.rpki || {};
+    if (rpkiCheck.disagreements && rpkiCheck.disagreements.length > 0) {
+      var disDiv = document.createElement('div');
+      disDiv.style.cssText = 'margin-top:.4rem;font-size:.6rem;color:var(--orange)';
+      disDiv.textContent = 'Disagreements Found: ' + rpkiCheck.disagreements.map(function(dd) { return dd.prefix; }).join(', ');
+      tooltip.appendChild(disDiv);
+    }
+
+    // Prefix note
+    var pfxCheck = checks.prefixes || {};
+    if (pfxCheck.note) {
+      var noteDiv = document.createElement('div');
+      noteDiv.style.cssText = 'margin-top:.3rem;font-size:.6rem;color:var(--dim)';
+      noteDiv.textContent = pfxCheck.note;
+      tooltip.appendChild(noteDiv);
+    }
+
+    // Overall note
+    var avgAgreement = totalChecks > 0 ? totalAgreement / totalChecks : 100;
+    var overallNote = document.createElement('div');
+    overallNote.style.cssText = 'margin-top:.4rem;font-size:.6rem;font-style:italic;color:var(--muted)';
+    if (avgAgreement > 90) {
+      overallNote.textContent = 'All sources agree';
+      overallNote.style.color = 'var(--green)';
+    } else if (avgAgreement >= 70) {
+      overallNote.textContent = 'Minor discrepancies between sources';
+      overallNote.style.color = 'var(--orange)';
+    } else {
+      overallNote.textContent = 'Significant data disagreements detected';
+      overallNote.style.color = 'var(--red)';
+    }
+    tooltip.appendChild(overallNote);
+
+    badge.appendChild(tooltip);
+    bar.appendChild(badge);
+  }
+}
+
 async function doLookup() {
   const raw = $('asnInput').value.trim().replace(/[^0-9]/g, '');
   if (!raw) return;
@@ -692,7 +827,7 @@ async function doLookup() {
     renderDashboard(d);
     $('skeleton').classList.add('hidden');
     $('dashboard').classList.remove('hidden');
-    $('metaBar').textContent = 'Query: ' + d.meta.query + ' | Duration: ' + d.meta.duration_ms + 'ms | RPKI checked: ' + d.meta.rpki_prefixes_checked + '/' + d.meta.total_prefixes + ' prefixes | ' + d.meta.timestamp;
+    renderMetaBar(d);
 
     history.replaceState(null, '', '?asn=' + raw);
     saveToHistory(raw, d.network ? d.network.name : 'AS' + raw);

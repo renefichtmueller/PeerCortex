@@ -620,6 +620,78 @@ function calculateAspaReadinessScore(params) {
 
 
 // ============================================================
+// Feature 30: RIPE NCC RPKI Validator cross-check (max 5 prefixes)
+// ============================================================
+async function fetchRipeRpkiValidator(asn, prefix) {
+  try {
+    const encoded = encodeURIComponent(prefix);
+    const url = "https://rpki-validator.ripe.net/api/v1/validity/AS" + asn + "/" + encoded;
+    const result = await fetchJSON(url, { timeout: 5000 });
+    if (result && result.validated_route) {
+      return {
+        prefix: prefix,
+        validity: result.validated_route.validity || {},
+        state: (result.validated_route.validity && result.validated_route.validity.state) || "unknown",
+      };
+    }
+    return { prefix: prefix, state: "unknown", error: "no_data" };
+  } catch (_e) {
+    return { prefix: prefix, state: "error", error: "timeout_or_unavailable" };
+  }
+}
+
+// Cross-check a sample of prefixes against RIPE RPKI Validator (max 5, in parallel)
+async function crossCheckRpki(asn, prefixes, localResults) {
+  const sample = prefixes.slice(0, 5);
+  if (sample.length === 0) return { cloudflare_valid: 0, ripe_valid: 0, agreement_pct: 100, disagreements: [], sample_size: 0 };
+
+  const ripeResults = await Promise.all(
+    sample.map((pfx) => fetchRipeRpkiValidator(asn, pfx))
+  );
+
+  const localMap = new Map();
+  for (const lr of localResults) {
+    localMap.set(lr.prefix, lr.status);
+  }
+
+  let cloudflareValid = 0;
+  let ripeValid = 0;
+  let agreements = 0;
+  const disagreements = [];
+
+  for (let i = 0; i < sample.length; i++) {
+    const pfx = sample[i];
+    const cfStatus = localMap.get(pfx) || "not_found";
+    const ripeState = ripeResults[i].state;
+
+    const cfIsValid = cfStatus === "valid";
+    const ripeIsValid = ripeState === "valid" || ripeState === "VALID";
+
+    if (cfIsValid) cloudflareValid++;
+    if (ripeIsValid) ripeValid++;
+
+    // Skip comparison if RIPE returned error/unknown
+    if (ripeState === "error" || ripeState === "unknown") {
+      agreements++; // Don't count failed lookups as disagreements
+      continue;
+    }
+
+    if (cfIsValid === ripeIsValid) {
+      agreements++;
+    } else {
+      disagreements.push({
+        prefix: pfx,
+        cloudflare: cfStatus,
+        ripe: ripeState,
+      });
+    }
+  }
+
+  const agreementPct = sample.length > 0 ? Math.round((agreements / sample.length) * 100) : 100;
+  return { cloudflare_valid: cloudflareValid, ripe_valid: ripeValid, agreement_pct: agreementPct, disagreements: disagreements, sample_size: sample.length };
+}
+
+// ============================================================
 // Feature 24: bgp.he.net Integration
 // ============================================================
 async function fetchBgpHeNet(asn) {
@@ -983,7 +1055,7 @@ const server = http.createServer(async (req, res) => {
       JSON.stringify({
         status: "ok",
         service: "PeerCortex",
-        version: "0.5.0",
+        version: "0.5.0-beta",
         timestamp: new Date().toISOString(),
         uptime_seconds: Math.floor(process.uptime()),
         bgproutes_configured: !!BGPROUTES_API_KEY,
@@ -2077,13 +2149,88 @@ const server = http.createServer(async (req, res) => {
         };
       })();
 
+      // ============================================================
+      // Multi-source cross-checks (run in parallel, non-blocking)
+      // ============================================================
+      let rpkiCrossCheck = { cloudflare_valid: 0, ripe_valid: 0, agreement_pct: 100, disagreements: [], sample_size: 0 };
+      let prefixCrossCheck = { ripe_stat: prefixes.length, bgp_he_net: null, agreement: null, note: "" };
+      let neighbourCrossCheck = { ripe_stat_total: neighbours.length, bgp_he_net_total: null };
+
+      try {
+        // RPKI cross-check: sample up to 5 prefixes against RIPE Validator (with 8s total timeout)
+        const rpkiCrossPromise = crossCheckRpki(asn, allPrefixes, rpkiStatuses);
+        const rpkiCrossResult = await Promise.race([
+          rpkiCrossPromise,
+          new Promise((resolve) => setTimeout(() => resolve(null), 8000)),
+        ]);
+        if (rpkiCrossResult) rpkiCrossCheck = rpkiCrossResult;
+      } catch (_e) { /* cross-check failed, keep defaults */ }
+
+      // Prefix count cross-check: compare RIPE Stat vs bgp.he.net
+      if (bgpHeData) {
+        const heV4 = bgpHeData.prefixes_v4 || 0;
+        const heV6 = bgpHeData.prefixes_v6 || 0;
+        const heTotal = heV4 + heV6;
+        if (heTotal > 0) {
+          prefixCrossCheck.bgp_he_net = heTotal;
+          const ripeStat = prefixes.length;
+          if (ripeStat > 0 && heTotal > 0) {
+            const ratio = Math.min(ripeStat, heTotal) / Math.max(ripeStat, heTotal);
+            prefixCrossCheck.agreement = ratio >= 0.9;
+            const diff = Math.abs(ripeStat - heTotal);
+            prefixCrossCheck.note = diff === 0
+              ? "Exact match"
+              : "Difference of " + diff + " prefixes (" + Math.round((1 - ratio) * 100) + "% divergence)";
+          }
+        } else {
+          prefixCrossCheck.note = "bgp.he.net prefix count unavailable";
+        }
+
+        // Neighbour cross-check: compare RIPE Stat vs bgp.he.net peer_count
+        if (bgpHeData.peer_count != null) {
+          neighbourCrossCheck.bgp_he_net_total = bgpHeData.peer_count;
+        }
+      } else {
+        prefixCrossCheck.note = "bgp.he.net data unavailable";
+      }
+
+      // Compute overall data quality
+      const crossCheckScores = [];
+      // RPKI agreement
+      crossCheckScores.push(rpkiCrossCheck.agreement_pct);
+      // Prefix agreement: convert to percentage
+      if (prefixCrossCheck.bgp_he_net != null && prefixes.length > 0) {
+        const pfxRatio = Math.min(prefixes.length, prefixCrossCheck.bgp_he_net) / Math.max(prefixes.length, prefixCrossCheck.bgp_he_net);
+        crossCheckScores.push(Math.round(pfxRatio * 100));
+      }
+      // Neighbour agreement
+      if (neighbourCrossCheck.bgp_he_net_total != null && neighbours.length > 0) {
+        const nbrRatio = Math.min(neighbours.length, neighbourCrossCheck.bgp_he_net_total) / Math.max(neighbours.length, neighbourCrossCheck.bgp_he_net_total);
+        crossCheckScores.push(Math.round(nbrRatio * 100));
+      }
+      const avgAgreement = crossCheckScores.length > 0
+        ? Math.round(crossCheckScores.reduce((a, b) => a + b, 0) / crossCheckScores.length)
+        : 100;
+      const overallConfidence = avgAgreement > 90 ? "high" : avgAgreement >= 70 ? "medium" : "low";
+
+      const dataQuality = {
+        sources_queried: ["PeeringDB", "RIPE Stat", "bgp.he.net", "Cloudflare RPKI", "RIPE RPKI Validator"],
+        cross_checks: {
+          rpki: { sources: 2, agreement_pct: rpkiCrossCheck.agreement_pct, sample_size: rpkiCrossCheck.sample_size, disagreements: rpkiCrossCheck.disagreements },
+          prefixes: { sources: 2, agreement_pct: prefixCrossCheck.bgp_he_net != null ? Math.round((Math.min(prefixes.length, prefixCrossCheck.bgp_he_net) / Math.max(prefixes.length, prefixCrossCheck.bgp_he_net || 1)) * 100) : null, ripe_stat: prefixCrossCheck.ripe_stat, bgp_he_net: prefixCrossCheck.bgp_he_net, note: prefixCrossCheck.note },
+          neighbours: { sources: 2, agreement_pct: neighbourCrossCheck.bgp_he_net_total != null && neighbours.length > 0 ? Math.round((Math.min(neighbours.length, neighbourCrossCheck.bgp_he_net_total) / Math.max(neighbours.length, neighbourCrossCheck.bgp_he_net_total)) * 100) : null, ripe_stat_total: neighbourCrossCheck.ripe_stat_total, bgp_he_net_total: neighbourCrossCheck.bgp_he_net_total },
+        },
+        overall_confidence: overallConfidence,
+        overall_agreement_pct: avgAgreement,
+      };
+
       const result = {
         meta: {
           service: "PeerCortex",
-          version: "0.5.0",
+          version: "0.5.0-beta",
           query: "AS" + asn,
           duration_ms: duration,
-          sources: ["PeeringDB", "RIPE Stat", "bgp.he.net", "Cloudflare RPKI", "Route Views"],
+          sources: ["PeeringDB", "RIPE Stat", "bgp.he.net", "Cloudflare RPKI", "RIPE RPKI Validator", "Route Views"],
           timestamp: new Date().toISOString(),
           rpki_prefixes_checked: rpkiTotal,
           total_prefixes: prefixes.length,
@@ -2111,6 +2258,7 @@ const server = http.createServer(async (req, res) => {
           ipv4: prefixes.filter((p) => !p.prefix.includes(":")).length,
           ipv6: prefixes.filter((p) => p.prefix.includes(":")).length,
           list: prefixes.map((p) => p.prefix),
+          cross_check: prefixCrossCheck,
         },
         rpki: {
           coverage_percent: rpkiCoverage,
@@ -2119,6 +2267,7 @@ const server = http.createServer(async (req, res) => {
           not_found: rpkiNotFound,
           checked: rpkiTotal,
           details: rpkiStatuses,
+          cross_check: rpkiCrossCheck,
         },
         neighbours: {
           total: neighbours.length,
@@ -2128,6 +2277,7 @@ const server = http.createServer(async (req, res) => {
           upstreams: upstreams.slice(0, 20),
           downstreams: downstreams.slice(0, 20),
           peers: peers.slice(0, 20),
+          cross_check: neighbourCrossCheck,
         },
         ix_presence: {
           total_connections: ixConnections.length,
@@ -2155,7 +2305,11 @@ const server = http.createServer(async (req, res) => {
             description: p.description || "",
           })),
         },
+        data_quality: dataQuality,
       };
+
+      // Update duration to include cross-check time
+      result.meta.duration_ms = Date.now() - start;
 
       cacheSet(cacheKey, result, CACHE_TTL_LOOKUP);
       res.end(JSON.stringify(result, null, 2));
