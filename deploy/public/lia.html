@@ -80,6 +80,22 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;background:
   <button class="export-btn" onclick="exportPDF()">Export PDF</button>
 </div>
 
+<div style="max-width:1400px;margin:.75rem auto;padding:0 1.5rem">
+  <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:1rem 1.5rem">
+    <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap">
+      <div style="font-size:.8rem;font-weight:600;color:var(--pink)">FILE LOOKUP</div>
+      <div style="font-size:.75rem;color:var(--dim)">Upload a file with ASNs or company names — we'll check probe coverage for each</div>
+      <div style="flex:1"></div>
+      <label style="padding:.45rem 1rem;border-radius:8px;border:1px solid var(--pink);background:transparent;color:var(--pink);font-size:.8rem;font-weight:600;cursor:pointer;transition:all .2s;display:inline-flex;align-items:center;gap:.4rem" onmouseenter="this.style.background='var(--pink)';this.style.color='var(--bg)'" onmouseleave="this.style.background='transparent';this.style.color='var(--pink)'">
+        <span>Upload File</span>
+        <input type="file" id="fileUpload" accept=".csv,.txt,.pdf,.xls,.xlsx,.doc,.docx" style="display:none" onchange="handleFileUpload(this)">
+      </label>
+      <span id="fileStatus" style="font-size:.7rem;color:var(--dim)"></span>
+    </div>
+    <div id="fileResults" class="hidden" style="margin-top:1rem"></div>
+  </div>
+</div>
+
 <div class="stats-bar" id="statsBar"></div>
 
 <div id="summaryGrid" class="summary-grid" style="max-width:1400px;margin:1rem auto;padding:0 1.5rem"></div>
@@ -314,6 +330,152 @@ function exportPDF() {
   });
 
   html += '<div class="meta" style="margin-top:3rem">Data from RIPE Atlas &amp; PeeringDB | peercortex.org</div></body></html>';
+  w.document.write(html);
+  w.document.close();
+  w.print();
+}
+
+// ============================================================
+// File Upload: Parse ASNs/company names from uploaded files
+// ============================================================
+function handleFileUpload(input) {
+  var file = input.files[0];
+  if (!file) return;
+  var status = $('fileStatus');
+  status.textContent = 'Processing ' + file.name + '...';
+  status.style.color = 'var(--cyan)';
+
+  var ext = file.name.split('.').pop().toLowerCase();
+
+  if (ext === 'csv' || ext === 'txt') {
+    file.text().then(function(text) { processFileText(text, file.name); });
+  } else if (ext === 'pdf' || ext === 'doc' || ext === 'docx' || ext === 'xls' || ext === 'xlsx') {
+    // For binary formats, upload to server for parsing
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      var base64 = e.target.result.split(',')[1];
+      fetch('/api/lia/parse-file', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filename: file.name, data: base64 })
+      }).then(function(r) { return r.json(); }).then(function(d) {
+        if (d.error) {
+          status.textContent = 'Error: ' + d.error;
+          status.style.color = 'var(--red)';
+          return;
+        }
+        processFileText(d.text || '', file.name);
+      }).catch(function(err) {
+        // Fallback: try reading as text
+        file.text().then(function(text) { processFileText(text, file.name); }).catch(function() {
+          status.textContent = 'Cannot parse ' + ext.toUpperCase() + ' files client-side. Use CSV or TXT.';
+          status.style.color = 'var(--red)';
+        });
+      });
+    };
+    reader.readAsDataURL(file);
+  } else {
+    status.textContent = 'Unsupported file type: ' + ext;
+    status.style.color = 'var(--red)';
+  }
+}
+
+function processFileText(text, filename) {
+  var status = $('fileStatus');
+
+  // Extract ASNs (AS12345 or just numbers that look like ASNs)
+  var asnMatches = text.match(/\bAS?(\d{3,7})\b/gi) || [];
+  var asns = new Set();
+  asnMatches.forEach(function(m) {
+    var num = parseInt(m.replace(/^AS/i, ''));
+    if (num >= 100 && num <= 9999999) asns.add(num);
+  });
+
+  // Also try to match company names against our loaded data
+  var nameMatches = [];
+  if (allData.length > 0) {
+    var lines = text.split(/[\n\r,;]+/).map(function(l) { return l.trim().toLowerCase(); }).filter(function(l) { return l.length > 2; });
+    lines.forEach(function(line) {
+      allData.forEach(function(n) {
+        if (n.name && n.name.toLowerCase().indexOf(line) >= 0 && line.length > 4) {
+          asns.add(n.asn);
+        }
+        if (line.indexOf(n.name ? n.name.toLowerCase() : '###') >= 0 && n.name && n.name.length > 4) {
+          asns.add(n.asn);
+        }
+      });
+    });
+  }
+
+  if (asns.size === 0) {
+    status.textContent = 'No ASNs or matching networks found in ' + filename;
+    status.style.color = 'var(--orange)';
+    return;
+  }
+
+  // Match against our data
+  var results = [];
+  var asnArr = Array.from(asns);
+  var dataMap = {};
+  allData.forEach(function(n) { dataMap[n.asn] = n; });
+
+  asnArr.forEach(function(asn) {
+    var n = dataMap[asn];
+    results.push({
+      asn: asn,
+      name: n ? n.name : '(Unknown)',
+      country: n ? n.country : '',
+      info_type: n ? n.info_type : '',
+      has_probe: n ? n.has_probe : false,
+      in_peeringdb: !!n,
+    });
+  });
+
+  results.sort(function(a, b) { return (a.has_probe ? 1 : 0) - (b.has_probe ? 1 : 0); });
+
+  var withProbe = results.filter(function(r) { return r.has_probe; }).length;
+  var noProbe = results.length - withProbe;
+
+  status.innerHTML = '<span style="color:var(--green)">' + withProbe + ' with probe</span> &middot; <span style="color:var(--red)">' + noProbe + ' without probe</span> &middot; ' + results.length + ' total from ' + escHtml(filename);
+
+  var h = '<div style="display:flex;gap:.5rem;margin-bottom:.75rem;flex-wrap:wrap">';
+  h += '<button class="export-btn" onclick="exportFileResults()" style="font-size:.7rem;padding:.3rem .8rem">Export Results as PDF</button>';
+  h += '</div>';
+  h += '<div class="asn-grid">';
+  results.forEach(function(r) {
+    h += '<div class="asn-row" onclick="window.open(\'/?asn=' + r.asn + '\',\'_blank\')">';
+    h += '<span class="asn-num">AS' + r.asn + '</span>';
+    h += '<span class="asn-name">' + escHtml(r.name) + '</span>';
+    if (r.country) h += '<span style="font-size:.65rem;color:var(--dim)">' + flag(r.country) + ' ' + r.country + '</span>';
+    if (r.info_type) h += '<span class="asn-type">' + escHtml(r.info_type) + '</span>';
+    h += r.has_probe ? '<span class="has-probe">\u2714 Probe</span>' : '<span class="no-probe">\u2718 No Probe</span>';
+    if (!r.in_peeringdb) h += '<span style="font-size:.6rem;color:var(--dim)">(not in PeeringDB)</span>';
+    h += '</div>';
+  });
+  h += '</div>';
+
+  $('fileResults').innerHTML = h;
+  $('fileResults').classList.remove('hidden');
+
+  // Store for export
+  window._fileResults = results;
+  window._fileName = filename;
+}
+
+function exportFileResults() {
+  if (!window._fileResults) return;
+  var results = window._fileResults;
+  var w = window.open('', '_blank');
+  var html = '<!DOCTYPE html><html><head><title>Atlas Probe Check — ' + escHtml(window._fileName) + '</title>';
+  html += '<style>body{font-family:Arial,sans-serif;margin:2rem;color:#1a1a2e}h1{color:#5b21b6;font-size:1.3rem}table{width:100%;border-collapse:collapse;margin:1rem 0}th,td{text-align:left;padding:.4rem .6rem;border-bottom:1px solid #e2e8f0;font-size:.85rem}th{background:#f8fafc;font-weight:600}.yes{color:#16a34a;font-weight:700}.no{color:#dc2626;font-weight:700}.meta{color:#64748b;font-size:.8rem}</style></head><body>';
+  html += '<h1>Atlas Probe Coverage Check</h1>';
+  html += '<div class="meta">Source: ' + escHtml(window._fileName) + ' | Generated: ' + new Date().toISOString().split('T')[0] + ' | peercortex.org/lia</div>';
+  html += '<table><thead><tr><th>ASN</th><th>Name</th><th>Country</th><th>Type</th><th>Atlas Probe</th></tr></thead><tbody>';
+  results.forEach(function(r) {
+    html += '<tr><td>AS' + r.asn + '</td><td>' + escHtml(r.name) + '</td><td>' + (r.country || '-') + '</td><td>' + (r.info_type || '-') + '</td>';
+    html += '<td class="' + (r.has_probe ? 'yes' : 'no') + '">' + (r.has_probe ? 'YES' : 'NO') + '</td></tr>';
+  });
+  html += '</tbody></table></body></html>';
   w.document.write(html);
   w.document.close();
   w.print();

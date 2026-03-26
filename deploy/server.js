@@ -737,101 +737,40 @@ const server = http.createServer(async (req, res) => {
     if (liaCached) return res.end(liaCached);
 
     // Fetch PeeringDB network list (all networks with status "ok")
+    // Use pre-cached org→country map (loaded at startup, 16MB response cached in memory)
     fetchPeeringDB("/net?status=ok&depth=0").then(function(pdbData) {
       if (!pdbData || !pdbData.data) {
         return res.end(JSON.stringify({ error: "Could not fetch PeeringDB networks" }));
       }
 
       var probeAsns = new Set(atlasProbeCache.asns_with_probes || []);
-      // Country name lookup
-      var countryNames = {};
-      try { countryNames = require("./country-names.json"); } catch(_e) { /* optional */ }
 
-      var networks = pdbData.data.map(function(n) {
+      var enriched = pdbData.data.map(function(n) {
+        var org = pdbOrgCountryMap.get(n.org_id) || {};
+        var cc = org.country || "";
         return {
           asn: n.asn,
           name: n.name || "",
-          country: n.info_prefixes4 > 0 || n.info_prefixes6 > 0 ? "" : "", // PeeringDB doesn't have country directly on net
+          org_name: org.name || "",
+          country: cc,
+          country_name: cc,
           info_type: n.info_type || "",
           has_probe: probeAsns.has(n.asn),
         };
+      }).filter(function(n) { return n.asn > 0 && n.country; });
+
+      var result = JSON.stringify({
+        networks: enriched,
+        total: enriched.length,
+        with_probes: enriched.filter(function(n) { return n.has_probe; }).length,
+        without_probes: enriched.filter(function(n) { return !n.has_probe; }).length,
+        atlas_unique_asns: probeAsns.size,
+        org_countries_loaded: pdbOrgCountryMap.size,
+        fetched_at: new Date().toISOString(),
       });
 
-      // We need countries — fetch from RIPE Stat for each unique ASN is too slow.
-      // Instead, use the Atlas byCountry data to enrich. For PeeringDB, we need netfac or netixlan for country.
-      // Better approach: Use PeeringDB org country. Fetch with depth=1 to get org.
-      // But that's too heavy (50MB+). Instead, use a separate PeeringDB call for orgs.
-      // Pragmatic: Fetch net with depth=1 but limit fields
-      // Actually the simplest: PeeringDB net API doesn't expose country directly.
-      // Use the ix_count/fac_count fields and the "org" for country.
-      // Let's just add a second call for orgs.
-
-      // Simplest approach: use RIPE Stat resource-overview for country from ASN prefix
-      // But that's per-ASN. Instead, build country from Atlas probes data.
-      // Atlas byCountry has {CC: {asnSet}} — we can reverse-map ASN→country from there.
-
-      // Build ASN→country from atlas data
-      // We stored asnSet in byCountry but only in the internal function.
-      // atlasProbeCache.by_country has {CC: {total, connected, asn_count}} — no ASN list!
-      // We need to store ASN→country mapping. Let's add it.
-
-      // For now, return without country and let frontend handle it via RIR mapping
-      // Actually: PeeringDB net objects have no country, but we can batch-fetch orgs.
-      // The org object has country. Let's do net?depth=1 but that's huge.
-      // Compromise: Get first 5000 networks and their org_id, then batch-fetch orgs.
-
-      // PRAGMATIC FIX: Use net?depth=0 + a separate org fetch
-      // PeeringDB org API: /org?status=ok&limit=0 returns all orgs with country.
-
-      fetchPeeringDB("/org?status=ok&depth=0").then(function(orgData) {
-        // Build org_id → country map
-        var orgCountry = {};
-        if (orgData && orgData.data) {
-          orgData.data.forEach(function(o) {
-            orgCountry[o.id] = { country: o.country || "", name: o.name || "" };
-          });
-        }
-
-        // Enrich networks with org country
-        var enriched = pdbData.data.map(function(n) {
-          var org = orgCountry[n.org_id] || {};
-          var cc = org.country || "";
-          return {
-            asn: n.asn,
-            name: n.name || "",
-            org_name: org.name || "",
-            country: cc,
-            country_name: cc, // frontend will display full name from its own mapping
-            info_type: n.info_type || "",
-            has_probe: probeAsns.has(n.asn),
-          };
-        }).filter(function(n) { return n.asn > 0; });
-
-        var result = JSON.stringify({
-          networks: enriched,
-          total: enriched.length,
-          with_probes: enriched.filter(function(n) { return n.has_probe; }).length,
-          without_probes: enriched.filter(function(n) { return !n.has_probe; }).length,
-          atlas_unique_asns: probeAsns.size,
-          fetched_at: new Date().toISOString(),
-        });
-
-        cacheSet(liaCacheKey, result, 30 * 60 * 1000); // 30 min cache
-        res.end(result);
-      }).catch(function(e) {
-        // If org fetch fails, return without country
-        var result = JSON.stringify({
-          networks: networks,
-          total: networks.length,
-          with_probes: networks.filter(function(n) { return n.has_probe; }).length,
-          without_probes: networks.filter(function(n) { return !n.has_probe; }).length,
-          atlas_unique_asns: probeAsns.size,
-          error_note: "Country data unavailable: " + e.message,
-          fetched_at: new Date().toISOString(),
-        });
-        cacheSet(liaCacheKey, result, 5 * 60 * 1000);
-        res.end(result);
-      });
+      cacheSet(liaCacheKey, result, 30 * 60 * 1000);
+      res.end(result);
     }).catch(function(e) {
       res.end(JSON.stringify({ error: "PeeringDB fetch failed: " + e.message }));
     });
@@ -2447,10 +2386,59 @@ function fetchAllAtlasProbes() {
   });
 }
 
+// ============================================================
+// PeeringDB Org → Country Cache (for Lia's Paradise)
+// ============================================================
+let pdbOrgCountryMap = new Map(); // org_id → { country, name }
+
+function fetchPdbOrgCountries() {
+  console.log("[PDB-ORG] Fetching PeeringDB org countries...");
+  return new Promise(function(resolve) {
+    // Use raw https to handle the large 16MB response with streaming
+    var chunks = [];
+    var req = require("https").get("https://www.peeringdb.com/api/org?status=ok&depth=0", {
+      headers: {
+        "User-Agent": UA,
+        "Authorization": PEERINGDB_API_KEY ? "Api-Key " + PEERINGDB_API_KEY : undefined,
+      },
+      timeout: 120000,
+    }, function(res) {
+      res.on("data", function(chunk) { chunks.push(chunk); });
+      res.on("end", function() {
+        try {
+          var body = Buffer.concat(chunks).toString("utf8");
+          var data = JSON.parse(body);
+          if (data && data.data) {
+            pdbOrgCountryMap = new Map();
+            data.data.forEach(function(o) {
+              if (o.id && o.country) {
+                pdbOrgCountryMap.set(o.id, { country: o.country, name: o.name || "" });
+              }
+            });
+            console.log("[PDB-ORG] Loaded " + pdbOrgCountryMap.size + " org→country mappings");
+          }
+        } catch (e) {
+          console.error("[PDB-ORG] Parse error:", e.message);
+        }
+        resolve();
+      });
+    });
+    req.on("error", function(e) {
+      console.error("[PDB-ORG] Fetch error:", e.message);
+      resolve();
+    });
+    req.on("timeout", function() {
+      console.error("[PDB-ORG] Timeout after 120s");
+      req.destroy();
+      resolve();
+    });
+  });
+}
+
 const PORT = process.env.PORT || 3101;
 
 // Fetch RPKI ASPA feed at startup and refresh every 10 minutes
-Promise.all([fetchRpkiAspaFeed(), fetchAllAtlasProbes()]).then(() => {
+Promise.all([fetchRpkiAspaFeed(), fetchAllAtlasProbes(), fetchPdbOrgCountries()]).then(() => {
   server.listen(PORT, "0.0.0.0", () => {
     console.log("PeerCortex v0.4.0 running on http://0.0.0.0:" + PORT);
     console.log("bgproutes.io API key: " + (BGPROUTES_API_KEY ? "configured" : "NOT configured"));
