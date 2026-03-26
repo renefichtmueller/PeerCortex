@@ -696,6 +696,148 @@ const server = http.createServer(async (req, res) => {
     return res.end();
   }
 
+  // Lia's Atlas Paradise - Easter egg page
+  if (reqPath === "/lia" || reqPath === "/lia/") {
+    try {
+      const liaHtml = fs.readFileSync(__dirname + "/public/lia.html", "utf8");
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      return res.end(liaHtml);
+    } catch (_e) {
+      res.writeHead(500);
+      return res.end("lia.html not found");
+    }
+  }
+
+
+  // ============================================================
+  // Lia's Atlas Paradise: Atlas probe coverage endpoint
+  // ============================================================
+  if (reqPath === "/api/atlas/coverage") {
+    res.setHeader("Content-Type", "application/json");
+    if (!atlasProbeCache) {
+      res.writeHead(503);
+      return res.end(JSON.stringify({ error: "Atlas probe data is still loading. Please try again in a minute." }));
+    }
+    return res.end(JSON.stringify(atlasProbeCache, null, 2));
+  }
+
+  // ============================================================
+  // Lia's Paradise: Combined PeeringDB + Atlas coverage data
+  // ============================================================
+  if (reqPath === "/api/lia/coverage") {
+    res.setHeader("Content-Type", "application/json");
+    if (!atlasProbeCache) {
+      res.writeHead(503);
+      return res.end(JSON.stringify({ error: "Atlas probe data is still loading. Please try again in a minute." }));
+    }
+
+    // Cache this expensive response for 30 min
+    var liaCacheKey = "lia_coverage";
+    var liaCached = cacheGet(liaCacheKey);
+    if (liaCached) return res.end(liaCached);
+
+    // Fetch PeeringDB network list (all networks with status "ok")
+    fetchPeeringDB("/net?status=ok&depth=0").then(function(pdbData) {
+      if (!pdbData || !pdbData.data) {
+        return res.end(JSON.stringify({ error: "Could not fetch PeeringDB networks" }));
+      }
+
+      var probeAsns = new Set(atlasProbeCache.asns_with_probes || []);
+      // Country name lookup
+      var countryNames = {};
+      try { countryNames = require("./country-names.json"); } catch(_e) { /* optional */ }
+
+      var networks = pdbData.data.map(function(n) {
+        return {
+          asn: n.asn,
+          name: n.name || "",
+          country: n.info_prefixes4 > 0 || n.info_prefixes6 > 0 ? "" : "", // PeeringDB doesn't have country directly on net
+          info_type: n.info_type || "",
+          has_probe: probeAsns.has(n.asn),
+        };
+      });
+
+      // We need countries — fetch from RIPE Stat for each unique ASN is too slow.
+      // Instead, use the Atlas byCountry data to enrich. For PeeringDB, we need netfac or netixlan for country.
+      // Better approach: Use PeeringDB org country. Fetch with depth=1 to get org.
+      // But that's too heavy (50MB+). Instead, use a separate PeeringDB call for orgs.
+      // Pragmatic: Fetch net with depth=1 but limit fields
+      // Actually the simplest: PeeringDB net API doesn't expose country directly.
+      // Use the ix_count/fac_count fields and the "org" for country.
+      // Let's just add a second call for orgs.
+
+      // Simplest approach: use RIPE Stat resource-overview for country from ASN prefix
+      // But that's per-ASN. Instead, build country from Atlas probes data.
+      // Atlas byCountry has {CC: {asnSet}} — we can reverse-map ASN→country from there.
+
+      // Build ASN→country from atlas data
+      // We stored asnSet in byCountry but only in the internal function.
+      // atlasProbeCache.by_country has {CC: {total, connected, asn_count}} — no ASN list!
+      // We need to store ASN→country mapping. Let's add it.
+
+      // For now, return without country and let frontend handle it via RIR mapping
+      // Actually: PeeringDB net objects have no country, but we can batch-fetch orgs.
+      // The org object has country. Let's do net?depth=1 but that's huge.
+      // Compromise: Get first 5000 networks and their org_id, then batch-fetch orgs.
+
+      // PRAGMATIC FIX: Use net?depth=0 + a separate org fetch
+      // PeeringDB org API: /org?status=ok&limit=0 returns all orgs with country.
+
+      fetchPeeringDB("/org?status=ok&depth=0").then(function(orgData) {
+        // Build org_id → country map
+        var orgCountry = {};
+        if (orgData && orgData.data) {
+          orgData.data.forEach(function(o) {
+            orgCountry[o.id] = { country: o.country || "", name: o.name || "" };
+          });
+        }
+
+        // Enrich networks with org country
+        var enriched = pdbData.data.map(function(n) {
+          var org = orgCountry[n.org_id] || {};
+          var cc = org.country || "";
+          return {
+            asn: n.asn,
+            name: n.name || "",
+            org_name: org.name || "",
+            country: cc,
+            country_name: cc, // frontend will display full name from its own mapping
+            info_type: n.info_type || "",
+            has_probe: probeAsns.has(n.asn),
+          };
+        }).filter(function(n) { return n.asn > 0; });
+
+        var result = JSON.stringify({
+          networks: enriched,
+          total: enriched.length,
+          with_probes: enriched.filter(function(n) { return n.has_probe; }).length,
+          without_probes: enriched.filter(function(n) { return !n.has_probe; }).length,
+          atlas_unique_asns: probeAsns.size,
+          fetched_at: new Date().toISOString(),
+        });
+
+        cacheSet(liaCacheKey, result, 30 * 60 * 1000); // 30 min cache
+        res.end(result);
+      }).catch(function(e) {
+        // If org fetch fails, return without country
+        var result = JSON.stringify({
+          networks: networks,
+          total: networks.length,
+          with_probes: networks.filter(function(n) { return n.has_probe; }).length,
+          without_probes: networks.filter(function(n) { return !n.has_probe; }).length,
+          atlas_unique_asns: probeAsns.size,
+          error_note: "Country data unavailable: " + e.message,
+          fetched_at: new Date().toISOString(),
+        });
+        cacheSet(liaCacheKey, result, 5 * 60 * 1000);
+        res.end(result);
+      });
+    }).catch(function(e) {
+      res.end(JSON.stringify({ error: "PeeringDB fetch failed: " + e.message }));
+    });
+    return;
+  }
+
   res.setHeader("Content-Type", "application/json");
 
   // Health endpoint
@@ -1147,8 +1289,20 @@ const server = http.createServer(async (req, res) => {
               return {
                 prefix: pfx,
                 as_path: asPath,
-                rov_status: rovStatus.split(",").map((s) => s === "V" ? "valid" : s === "I" ? "invalid" : s === "U" ? "unknown" : s).join(","),
-                aspa_status: aspaStatus.split(",").map((s) => s === "V" ? "valid" : s === "I" ? "invalid" : s === "U" ? "unknown" : s).join(","),
+                rov_status: (function(rs) {
+                  var parts = rs.split(",").map(function(s) { return s === "V" ? "valid" : s === "I" ? "invalid" : s === "U" ? "unknown" : s; });
+                  if (parts.indexOf("invalid") >= 0) return "invalid";
+                  if (parts.indexOf("unknown") >= 0) return "unknown";
+                  if (parts.indexOf("valid") >= 0) return "valid";
+                  return parts[0] || "unknown";
+                })(rovStatus),
+                aspa_status: (function(as) {
+                  var parts = as.split(",").map(function(s) { return s === "V" ? "valid" : s === "I" ? "invalid" : s === "U" ? "unknown" : s; });
+                  if (parts.indexOf("invalid") >= 0) return "invalid";
+                  if (parts.indexOf("unknown") >= 0) return "unknown";
+                  if (parts.indexOf("valid") >= 0) return "valid";
+                  return parts[0] || "unknown";
+                })(aspaStatus),
               };
             });
 
@@ -1735,6 +1889,7 @@ const server = http.createServer(async (req, res) => {
           asn: parseInt(asn),
           name: net.name || overview?.holder || "Unknown",
           aka: net.aka || "",
+          org_name: (net.org && net.org.name) ? net.org.name : "",
           website: net.website || "",
           type: net.info_type || "",
           policy: net.policy_general || "",
@@ -2221,10 +2376,81 @@ const server = http.createServer(async (req, res) => {
   );
 });
 
+
+// ============================================================
+// Atlas Probe Cache (for Lia's Atlas Paradise)
+// ============================================================
+let atlasProbeCache = null;
+let atlasProbeFetching = false;
+
+function fetchAllAtlasProbes() {
+  if (atlasProbeFetching) return Promise.resolve();
+  atlasProbeFetching = true;
+  console.log("[ATLAS] Fetching all Atlas probes...");
+
+  return new Promise(function(resolve) {
+    var allAsns = new Set();
+    var byCountry = {};
+    var pageCount = 0;
+    var maxPages = 40;
+
+    function fetchPage(pageUrl) {
+      if (pageCount >= maxPages) return finish();
+      pageCount++;
+
+      fetchJSON(pageUrl).then(function(data) {
+        if (!data || !data.results) return finish();
+
+        data.results.forEach(function(probe) {
+          var asn4 = probe.asn_v4;
+          var asn6 = probe.asn_v6;
+          var cc = probe.country_code || "XX";
+
+          if (!byCountry[cc]) byCountry[cc] = { total: 0, connected: 0, asnSet: new Set() };
+          byCountry[cc].total++;
+          if (probe.status && probe.status.id === 1) byCountry[cc].connected++;
+          if (asn4) { allAsns.add(asn4); byCountry[cc].asnSet.add(asn4); }
+          if (asn6) { allAsns.add(asn6); byCountry[cc].asnSet.add(asn6); }
+        });
+
+        if (data.next) {
+          fetchPage(data.next);
+        } else {
+          finish();
+        }
+      }).catch(function() { finish(); });
+    }
+
+    function finish() {
+      var byCountryOut = {};
+      Object.keys(byCountry).forEach(function(cc) {
+        var info = byCountry[cc];
+        byCountryOut[cc] = { total: info.total, connected: info.connected, asn_count: info.asnSet.size };
+      });
+
+      atlasProbeCache = {
+        total_probes: Object.keys(byCountry).reduce(function(s, cc) { return s + byCountry[cc].total; }, 0),
+        total_connected: Object.keys(byCountry).reduce(function(s, cc) { return s + byCountry[cc].connected; }, 0),
+        unique_asns_with_probes: allAsns.size,
+        asns_with_probes: Array.from(allAsns).sort(function(a, b) { return a - b; }),
+        by_country: byCountryOut,
+        fetched_at: new Date().toISOString(),
+        pages_fetched: pageCount,
+      };
+
+      console.log("[ATLAS] Loaded " + allAsns.size + " unique ASNs with probes (" + pageCount + " pages)");
+      atlasProbeFetching = false;
+      resolve();
+    }
+
+    fetchPage("https://atlas.ripe.net/api/v2/probes/?page_size=500&status=1&page=1&format=json");
+  });
+}
+
 const PORT = process.env.PORT || 3101;
 
 // Fetch RPKI ASPA feed at startup and refresh every 10 minutes
-fetchRpkiAspaFeed().then(() => {
+Promise.all([fetchRpkiAspaFeed(), fetchAllAtlasProbes()]).then(() => {
   server.listen(PORT, "0.0.0.0", () => {
     console.log("PeerCortex v0.4.0 running on http://0.0.0.0:" + PORT);
     console.log("bgproutes.io API key: " + (BGPROUTES_API_KEY ? "configured" : "NOT configured"));
@@ -2236,3 +2462,8 @@ fetchRpkiAspaFeed().then(() => {
 setInterval(() => {
   fetchRpkiAspaFeed();
 }, 10 * 60 * 1000);
+
+// Refresh Atlas probe cache every hour
+setInterval(function() {
+  fetchAllAtlasProbes();
+}, 60 * 60 * 1000);

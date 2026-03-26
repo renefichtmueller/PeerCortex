@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lia's Paradise — RIPE Atlas Coverage Explorer</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#0f0f1a;--card:#1a1b26;--border:#2a2b3d;--border-light:#363750;--text:#e2e8f0;--text-dim:#94a3b8;--muted:#64748b;--dim:#475569;--purple:#a78bfa;--blue:#60a5fa;--green:#4ade80;--orange:#fbbf24;--red:#f87171;--cyan:#22d3ee;--pink:#f472b6}
+body{font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+.header{background:linear-gradient(135deg,#1a1b26 0%,#1e1f30 100%);border-bottom:1px solid var(--border);padding:1.5rem 2rem;text-align:center}
+.header h1{font-size:1.8rem;font-weight:800;background:linear-gradient(135deg,var(--pink),var(--purple),var(--cyan));-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:.25rem}
+.header p{color:var(--text-dim);font-size:.85rem}
+.easter-egg{font-size:.65rem;color:var(--dim);margin-top:.25rem;font-style:italic}
+.controls{max-width:1400px;margin:1.5rem auto;padding:0 1.5rem;display:flex;gap:1rem;flex-wrap:wrap;align-items:center}
+.search-box{flex:1;min-width:200px;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:.7rem 1rem;font-size:.9rem;color:var(--text);font-family:inherit;outline:none}
+.search-box:focus{border-color:var(--purple)}
+.search-box::placeholder{color:var(--dim)}
+.rir-tabs{display:flex;gap:.4rem;flex-wrap:wrap}
+.rir-tab{padding:.5rem 1rem;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--text-dim);font-size:.8rem;font-weight:600;cursor:pointer;transition:all .2s;font-family:inherit}
+.rir-tab:hover{border-color:var(--purple);color:var(--text)}
+.rir-tab.active{background:linear-gradient(135deg,#5b21b6,#7c3aed);color:#fff;border-color:#7c3aed}
+.export-btn{padding:.5rem 1.2rem;border-radius:8px;border:1px solid var(--cyan);background:transparent;color:var(--cyan);font-size:.8rem;font-weight:600;cursor:pointer;transition:all .2s;font-family:inherit}
+.export-btn:hover{background:var(--cyan);color:var(--bg)}
+.stats-bar{max-width:1400px;margin:.75rem auto;padding:0 1.5rem;display:flex;gap:1.5rem;flex-wrap:wrap}
+.stat-pill{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:.5rem 1rem;display:flex;align-items:center;gap:.5rem}
+.stat-pill .num{font-size:1.1rem;font-weight:800}
+.stat-pill .label{font-size:.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.content{max-width:1400px;margin:1rem auto;padding:0 1.5rem}
+.loading{text-align:center;padding:3rem;color:var(--muted);font-size:.9rem}
+.loading .spinner{display:inline-block;width:20px;height:20px;border:2px solid var(--border);border-top-color:var(--purple);border-radius:50%;animation:spin .6s linear infinite;margin-right:.5rem;vertical-align:middle}
+@keyframes spin{to{transform:rotate(360deg)}}
+.country-section{margin-bottom:1.5rem}
+.country-header{display:flex;align-items:center;gap:.75rem;padding:.6rem 1rem;background:var(--card);border:1px solid var(--border);border-radius:10px;cursor:pointer;transition:all .2s;margin-bottom:.5rem}
+.country-header:hover{border-color:var(--purple)}
+.country-flag{font-size:1.2rem}
+.country-name{font-weight:700;font-size:.95rem;flex:1}
+.country-count{font-size:.75rem;color:var(--muted)}
+.country-badge{padding:.2rem .6rem;border-radius:6px;font-size:.7rem;font-weight:700}
+.badge-red{background:#f8717118;color:var(--red);border:1px solid #f8717130}
+.badge-green{background:#4ade8018;color:var(--green);border:1px solid #4ade8030}
+.badge-orange{background:#fbbf2418;color:var(--orange);border:1px solid #fbbf2430}
+.asn-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:.4rem;padding:0 0 .5rem 0}
+.asn-row{display:flex;align-items:center;gap:.65rem;padding:.5rem .85rem;background:var(--bg);border:1px solid var(--border);border-radius:8px;font-size:.8rem;transition:all .15s;cursor:pointer}
+.asn-row:hover{border-color:var(--purple);transform:translateY(-1px)}
+.asn-num{font-weight:700;color:var(--purple);min-width:80px;font-family:'JetBrains Mono',monospace}
+.asn-name{flex:1;color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.asn-type{font-size:.65rem;padding:.15rem .4rem;border-radius:4px;background:var(--card);color:var(--dim);border:1px solid var(--border)}
+.no-probe{color:var(--red);font-size:.65rem;font-weight:600}
+.has-probe{color:var(--green);font-size:.65rem;font-weight:600}
+.summary-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:.75rem;margin-bottom:1.5rem}
+.summary-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:1.25rem;text-align:center}
+.summary-card .rir-name{font-size:.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;margin-bottom:.5rem}
+.summary-card .big-num{font-size:2rem;font-weight:800}
+.summary-card .sub{font-size:.7rem;color:var(--dim);margin-top:.25rem}
+.progress-bar{height:6px;background:var(--bg);border-radius:3px;margin-top:.5rem;overflow:hidden}
+.progress-fill{height:100%;border-radius:3px;transition:width .5s ease}
+.hidden{display:none}
+.footer{text-align:center;padding:2rem;color:var(--dim);font-size:.7rem;margin-top:2rem;border-top:1px solid var(--border)}
+.footer a{color:var(--purple);text-decoration:none}
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>Lia's Paradise</h1>
+  <p>RIPE Atlas Coverage Explorer — Networks without Atlas Probes, Anchors & Software Probes</p>
+  <div class="easter-egg">For Lia, who makes the Internet measurable — one probe at a time</div>
+</div>
+
+<div class="controls">
+  <input type="text" class="search-box" id="searchInput" placeholder="Search by country, ASN, or network name..." oninput="filterResults()">
+  <div class="rir-tabs" id="rirTabs">
+    <button class="rir-tab active" onclick="switchRIR('all',this)">All RIRs</button>
+    <button class="rir-tab" onclick="switchRIR('ripencc',this)">RIPE NCC</button>
+    <button class="rir-tab" onclick="switchRIR('arin',this)">ARIN</button>
+    <button class="rir-tab" onclick="switchRIR('apnic',this)">APNIC</button>
+    <button class="rir-tab" onclick="switchRIR('lacnic',this)">LACNIC</button>
+    <button class="rir-tab" onclick="switchRIR('afrinic',this)">AFRINIC</button>
+  </div>
+  <button class="export-btn" onclick="exportPDF()">Export PDF</button>
+</div>
+
+<div class="stats-bar" id="statsBar"></div>
+
+<div id="summaryGrid" class="summary-grid" style="max-width:1400px;margin:1rem auto;padding:0 1.5rem"></div>
+
+<div class="content" id="mainContent">
+  <div class="loading"><span class="spinner"></span>Loading Atlas coverage data across all RIRs... This may take a moment.</div>
+</div>
+
+<div class="footer">
+  <a href="/">Back to PeerCortex</a> &middot; Data from <a href="https://atlas.ripe.net" target="_blank">RIPE Atlas</a> &amp; <a href="https://www.peeringdb.com" target="_blank">PeeringDB</a>
+  <br>Made with love for the Atlas community
+</div>
+
+<script>
+var allData = [];
+var currentRIR = 'all';
+var countryFlags = {};
+
+function $(id) { return document.getElementById(id); }
+function escHtml(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+// Country code to flag emoji
+function flag(cc) {
+  if (!cc || cc.length !== 2) return '';
+  return String.fromCodePoint(...cc.toUpperCase().split('').map(c => 0x1F1E6 + c.charCodeAt(0) - 65));
+}
+
+// RIR mapping by country
+var rirMap = {
+  ripencc: new Set(['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IS','IE','IT','LV','LT','LU','MT','NL','NO','PL','PT','RO','SK','SI','ES','SE','CH','GB','UA','RU','TR','GE','AZ','AM','MD','BY','RS','BA','ME','MK','AL','XK','LI','MC','SM','VA','AD','FO','GL','AX','GG','JE','IM','BH','IQ','IR','IL','JO','KW','LB','OM','PS','QA','SA','SY','AE','YE','DZ','EG','LY','MA','TN','EH']),
+  arin: new Set(['US','CA','PR','VI','GU','AS','MP','MH','FM','PW','UM']),
+  apnic: new Set(['AU','NZ','JP','KR','CN','HK','MO','TW','IN','BD','PK','LK','NP','BT','MV','AF','MM','TH','VN','LA','KH','MY','SG','ID','PH','BN','TL','PG','FJ','WS','TO','VU','SB','KI','NR','TV','MN','KZ','KG','TJ','TM','UZ']),
+  lacnic: new Set(['MX','GT','BZ','SV','HN','NI','CR','PA','CO','VE','EC','PE','BO','CL','AR','UY','PY','BR','GY','SR','GF','CU','JM','HT','DO','TT','BB','AG','DM','GD','KN','LC','VC','BS','CW','AW','SX','BQ','TC','KY','BM']),
+  afrinic: new Set(['ZA','NG','KE','GH','TZ','UG','ET','RW','SN','CI','CM','CD','CG','GA','AO','MZ','ZW','ZM','MW','BW','NA','SZ','LS','MG','MU','SC','DJ','ER','SO','SD','SS','TD','NE','ML','BF','GW','GN','SL','LR','TG','BJ','CF','GQ']),
+};
+
+function getRIR(cc) {
+  if (!cc) return 'unknown';
+  for (var r in rirMap) { if (rirMap[r].has(cc.toUpperCase())) return r; }
+  return 'unknown';
+}
+
+async function loadData() {
+  try {
+    // Fetch PeeringDB networks with IX presence (active networks)
+    var resp = await fetch('/api/lia/coverage');
+    var d = await resp.json();
+    if (d.error) throw new Error(d.error);
+    allData = d.networks || [];
+    renderAll();
+  } catch (e) {
+    $('mainContent').innerHTML = '<div class="loading" style="color:var(--red)">Failed to load: ' + escHtml(e.message) + '</div>';
+  }
+}
+
+function renderAll() {
+  renderSummary();
+  renderStats();
+  renderCountries();
+}
+
+function renderSummary() {
+  var rir_stats = { ripencc: {total:0,noProbe:0}, arin: {total:0,noProbe:0}, apnic: {total:0,noProbe:0}, lacnic: {total:0,noProbe:0}, afrinic: {total:0,noProbe:0} };
+  var rirLabels = { ripencc:'RIPE NCC', arin:'ARIN', apnic:'APNIC', lacnic:'LACNIC', afrinic:'AFRINIC' };
+  var rirColors = { ripencc:'var(--blue)', arin:'var(--green)', apnic:'var(--orange)', lacnic:'var(--pink)', afrinic:'var(--cyan)' };
+
+  allData.forEach(function(n) {
+    var r = getRIR(n.country);
+    if (rir_stats[r]) {
+      rir_stats[r].total++;
+      if (!n.has_probe) rir_stats[r].noProbe++;
+    }
+  });
+
+  var h = '';
+  for (var r in rir_stats) {
+    var s = rir_stats[r];
+    var covPct = s.total > 0 ? ((s.total - s.noProbe) / s.total * 100).toFixed(1) : '0';
+    var col = rirColors[r];
+    h += '<div class="summary-card">';
+    h += '<div class="rir-name">' + rirLabels[r] + '</div>';
+    h += '<div class="big-num" style="color:' + col + '">' + s.noProbe.toLocaleString() + '</div>';
+    h += '<div class="sub">of ' + s.total.toLocaleString() + ' networks without a probe</div>';
+    h += '<div class="progress-bar"><div class="progress-fill" style="width:' + covPct + '%;background:' + col + '"></div></div>';
+    h += '<div class="sub" style="margin-top:.25rem">' + covPct + '% coverage</div>';
+    h += '</div>';
+  }
+  $('summaryGrid').innerHTML = h;
+}
+
+function renderStats() {
+  var filtered = getFiltered();
+  var noProbe = filtered.filter(function(n) { return !n.has_probe; }).length;
+  var withProbe = filtered.length - noProbe;
+  var countries = new Set(filtered.map(function(n) { return n.country; })).size;
+
+  var h = '';
+  h += '<div class="stat-pill"><span class="num" style="color:var(--red)">' + noProbe.toLocaleString() + '</span><span class="label">Without Probe</span></div>';
+  h += '<div class="stat-pill"><span class="num" style="color:var(--green)">' + withProbe.toLocaleString() + '</span><span class="label">With Probe</span></div>';
+  h += '<div class="stat-pill"><span class="num" style="color:var(--purple)">' + filtered.length.toLocaleString() + '</span><span class="label">Total Networks</span></div>';
+  h += '<div class="stat-pill"><span class="num" style="color:var(--cyan)">' + countries + '</span><span class="label">Countries</span></div>';
+  $('statsBar').innerHTML = h;
+}
+
+function getFiltered() {
+  var q = ($('searchInput').value || '').toLowerCase();
+  return allData.filter(function(n) {
+    if (currentRIR !== 'all' && getRIR(n.country) !== currentRIR) return false;
+    if (q) {
+      var haystack = (n.name + ' ' + n.country + ' ' + n.country_name + ' AS' + n.asn + ' ' + (n.info_type || '')).toLowerCase();
+      if (haystack.indexOf(q) < 0) return false;
+    }
+    return true;
+  });
+}
+
+function renderCountries() {
+  var filtered = getFiltered();
+
+  // Group by country
+  var byCountry = {};
+  filtered.forEach(function(n) {
+    var cc = n.country || 'XX';
+    if (!byCountry[cc]) byCountry[cc] = { name: n.country_name || cc, networks: [] };
+    byCountry[cc].networks.push(n);
+  });
+
+  // Sort countries by number of networks without probes (descending)
+  var countries = Object.keys(byCountry).sort(function(a, b) {
+    var aNo = byCountry[a].networks.filter(function(n) { return !n.has_probe; }).length;
+    var bNo = byCountry[b].networks.filter(function(n) { return !n.has_probe; }).length;
+    return bNo - aNo;
+  });
+
+  var h = '';
+  countries.forEach(function(cc) {
+    var c = byCountry[cc];
+    var noProbe = c.networks.filter(function(n) { return !n.has_probe; });
+    var withProbe = c.networks.filter(function(n) { return n.has_probe; });
+    var covPct = (withProbe.length / c.networks.length * 100).toFixed(0);
+    var badgeClass = covPct >= 70 ? 'badge-green' : covPct >= 30 ? 'badge-orange' : 'badge-red';
+    var secId = 'country_' + cc;
+
+    h += '<div class="country-section">';
+    h += '<div class="country-header" onclick="var el=document.getElementById(\'' + secId + '\');el.classList.toggle(\'hidden\');this.querySelector(\'.arrow\').textContent=el.classList.contains(\'hidden\')?\'\u25B6\':\'\u25BC\'">';
+    h += '<span class="country-flag">' + flag(cc) + '</span>';
+    h += '<span class="country-name">' + escHtml(c.name) + ' (' + cc + ')</span>';
+    h += '<span class="country-count">' + noProbe.length + ' without probe / ' + c.networks.length + ' total</span>';
+    h += '<span class="' + badgeClass + ' country-badge">' + covPct + '% coverage</span>';
+    h += '<span class="arrow" style="color:var(--muted)">\u25B6</span>';
+    h += '</div>';
+
+    h += '<div id="' + secId + '" class="hidden">';
+    // Show networks WITHOUT probes first
+    if (noProbe.length > 0) {
+      h += '<div style="font-size:.7rem;color:var(--red);font-weight:600;margin:.5rem 0 .3rem;padding-left:.5rem">NO PROBE (' + noProbe.length + ')</div>';
+      h += '<div class="asn-grid">';
+      noProbe.sort(function(a,b) { return a.asn - b.asn; }).forEach(function(n) {
+        h += '<div class="asn-row" onclick="window.open(\'/?asn=' + n.asn + '\',\'_blank\')">';
+        h += '<span class="asn-num">AS' + n.asn + '</span>';
+        h += '<span class="asn-name">' + escHtml(n.name || '') + '</span>';
+        if (n.info_type) h += '<span class="asn-type">' + escHtml(n.info_type) + '</span>';
+        h += '<span class="no-probe">\u2718 No Probe</span>';
+        h += '</div>';
+      });
+      h += '</div>';
+    }
+    // Networks WITH probes
+    if (withProbe.length > 0) {
+      h += '<div style="font-size:.7rem;color:var(--green);font-weight:600;margin:.75rem 0 .3rem;padding-left:.5rem">HAS PROBE (' + withProbe.length + ')</div>';
+      h += '<div class="asn-grid">';
+      withProbe.sort(function(a,b) { return a.asn - b.asn; }).slice(0, 20).forEach(function(n) {
+        h += '<div class="asn-row" onclick="window.open(\'/?asn=' + n.asn + '\',\'_blank\')">';
+        h += '<span class="asn-num">AS' + n.asn + '</span>';
+        h += '<span class="asn-name">' + escHtml(n.name || '') + '</span>';
+        if (n.info_type) h += '<span class="asn-type">' + escHtml(n.info_type) + '</span>';
+        h += '<span class="has-probe">\u2714 Probe</span>';
+        h += '</div>';
+      });
+      if (withProbe.length > 20) h += '<div style="font-size:.75rem;color:var(--dim);padding:.3rem .5rem">+ ' + (withProbe.length - 20) + ' more with probes</div>';
+      h += '</div>';
+    }
+    h += '</div>';
+    h += '</div>';
+  });
+
+  if (countries.length === 0) {
+    h = '<div class="loading">No results found. Try a different search or RIR filter.</div>';
+  }
+
+  $('mainContent').innerHTML = h;
+}
+
+function switchRIR(rir, btn) {
+  currentRIR = rir;
+  document.querySelectorAll('.rir-tab').forEach(function(t) { t.classList.remove('active'); });
+  btn.classList.add('active');
+  renderStats();
+  renderCountries();
+}
+
+function filterResults() {
+  renderStats();
+  renderCountries();
+}
+
+function exportPDF() {
+  // Generate a printable version
+  var w = window.open('', '_blank');
+  var filtered = getFiltered().filter(function(n) { return !n.has_probe; });
+  var byCountry = {};
+  filtered.forEach(function(n) {
+    var cc = n.country || 'XX';
+    if (!byCountry[cc]) byCountry[cc] = { name: n.country_name || cc, networks: [] };
+    byCountry[cc].networks.push(n);
+  });
+
+  var html = '<!DOCTYPE html><html><head><title>Atlas Coverage Report — Lia\'s Paradise</title>';
+  html += '<style>body{font-family:Arial,sans-serif;margin:2rem;color:#1a1a2e}h1{color:#5b21b6}h2{color:#7c3aed;margin-top:1.5rem;border-bottom:2px solid #e2e8f0;padding-bottom:.3rem}table{width:100%;border-collapse:collapse;margin:.5rem 0 1rem}th,td{text-align:left;padding:.4rem .6rem;border-bottom:1px solid #e2e8f0;font-size:.85rem}th{background:#f8fafc;font-weight:600}.no-probe{color:#dc2626;font-weight:600}.meta{color:#64748b;font-size:.8rem;margin-bottom:2rem}</style></head><body>';
+  html += '<h1>RIPE Atlas Coverage Report</h1>';
+  html += '<div class="meta">Generated by Lia\'s Paradise (peercortex.org/lia) on ' + new Date().toISOString().split('T')[0] + '<br>';
+  html += 'Filter: ' + (currentRIR === 'all' ? 'All RIRs' : currentRIR.toUpperCase()) + ' | Networks without Atlas Probe: ' + filtered.length + '</div>';
+
+  Object.keys(byCountry).sort(function(a,b) { return byCountry[b].networks.length - byCountry[a].networks.length; }).forEach(function(cc) {
+    var c = byCountry[cc];
+    html += '<h2>' + c.name + ' (' + cc + ') — ' + c.networks.length + ' networks</h2>';
+    html += '<table><thead><tr><th>ASN</th><th>Name</th><th>Type</th><th>Status</th></tr></thead><tbody>';
+    c.networks.sort(function(a,b) { return a.asn - b.asn; }).forEach(function(n) {
+      html += '<tr><td>AS' + n.asn + '</td><td>' + (n.name || '') + '</td><td>' + (n.info_type || '-') + '</td><td class="no-probe">No Probe</td></tr>';
+    });
+    html += '</tbody></table>';
+  });
+
+  html += '<div class="meta" style="margin-top:3rem">Data from RIPE Atlas &amp; PeeringDB | peercortex.org</div></body></html>';
+  w.document.write(html);
+  w.document.close();
+  w.print();
+}
+
+// Boot
+loadData();
+</script>
+</body>
+</html>
