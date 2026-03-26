@@ -626,21 +626,33 @@ function renderAspa(d) {
   h += '</div>';
   h += '</div>';
 
-  // Detected providers
+  // Detected providers (collapsible after 10)
   if (d.detected_providers && d.detected_providers.length > 0) {
-    h += '<div style="font-size:.8rem;font-weight:600;color:var(--orange);margin:.75rem 0 .4rem">Detected Upstream Providers</div>';
-    h += '<div style="display:flex;flex-wrap:wrap;gap:.3rem;margin-bottom:1rem">';
-    d.detected_providers.forEach(function(p) {
+    var provLimit = 10;
+    var provList = d.detected_providers;
+    h += '<div style="font-size:.8rem;font-weight:600;color:var(--orange);margin:.75rem 0 .4rem">Detected Upstream Providers (' + provList.length + ')</div>';
+    h += '<div style="display:flex;flex-wrap:wrap;gap:.3rem;margin-bottom:.25rem">';
+    provList.slice(0, provLimit).forEach(function(p) {
       var nameStr = (p.name && p.name !== 'AS' + p.asn) ? ' ' + escHtml(p.name) : '';
       h += '<span class="badge badge-orange">' + asnLink(p.asn) + nameStr + '</span>';
     });
     h += '</div>';
+    if (provList.length > provLimit) {
+      var provMoreId = 'provMore' + Date.now();
+      h += '<div id="' + provMoreId + '" style="display:none;flex-wrap:wrap;gap:.3rem;margin-bottom:.25rem">';
+      provList.slice(provLimit).forEach(function(p) {
+        var nameStr = (p.name && p.name !== 'AS' + p.asn) ? ' ' + escHtml(p.name) : '';
+        h += '<span class="badge badge-orange">' + asnLink(p.asn) + nameStr + '</span>';
+      });
+      h += '</div>';
+      h += '<div class="show-more-btn" onclick="var el=document.getElementById(\'' + provMoreId + '\');if(el.style.display===\'none\'){el.style.display=\'flex\';this.textContent=\'Hide ' + (provList.length - provLimit) + ' providers\';}else{el.style.display=\'none\';this.textContent=\'Show ' + (provList.length - provLimit) + ' more providers...\';}">Show ' + (provList.length - provLimit) + ' more providers...</div>';
+    }
   }
 
-  // Recommended ASPA template
+  // Recommended ASPA template (scrollable, max 200px)
   if (d.recommended_aspa) {
     h += '<div style="font-size:.8rem;font-weight:600;color:var(--cyan);margin:.75rem 0 .4rem">Recommended ASPA Object</div>';
-    h += '<div class="aspa-template" id="aspaTemplate">' + escHtml(d.recommended_aspa);
+    h += '<div class="aspa-template" id="aspaTemplate" style="max-height:200px;overflow-y:auto">' + escHtml(d.recommended_aspa);
     h += '<button class="copy-btn" onclick="copyToClipboard(document.getElementById(\'aspaTemplate\').innerText, this)">Copy</button>';
     h += '</div>';
   }
