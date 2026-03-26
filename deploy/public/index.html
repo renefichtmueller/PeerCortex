@@ -223,6 +223,9 @@ a{color:var(--blue);text-decoration:none;transition:color .2s}a:hover{color:var(
 .health-tooltip .tt-fix{color:#ff9e64;font-style:italic}
 .health-check-item:hover .health-tooltip{display:block}
 
+.show-more-btn{font-size:.8rem;color:var(--blue);cursor:pointer;padding:.5rem 0;margin-top:.25rem;transition:color .2s;user-select:none}
+.show-more-btn:hover{color:var(--cyan);text-decoration:underline}
+
 /* Routing Overview - Propagation Bars */
 .routing-stats-row{display:flex;gap:1rem;flex-wrap:wrap;margin-bottom:1.25rem}
 .routing-stat-card{flex:1;min-width:100px;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:.875rem 1rem;text-align:center}
@@ -1169,27 +1172,57 @@ function renderAspaDeep(d) {
   h += '<div><span style="font-size:.7rem;color:var(--muted);text-transform:uppercase">Completeness</span><div style="font-size:1.3rem;font-weight:700;color:' + ((audit.completeness_pct || 0) >= 80 ? 'var(--green)' : 'var(--orange)') + '">' + (audit.completeness_pct || 0) + '%</div></div>';
   h += '</div>';
 
-  // Missing from ASPA
+  // Missing from ASPA (collapsible after 5)
   if (audit.missing_from_aspa && audit.missing_from_aspa.length > 0) {
-    h += '<div style="font-size:.8rem;font-weight:600;color:var(--orange);margin:.5rem 0 .3rem">Missing from ASPA Declaration</div>';
-    audit.missing_from_aspa.forEach(function(m) {
+    var missingList = audit.missing_from_aspa;
+    var LIMIT = 5;
+    h += '<div style="font-size:.8rem;font-weight:600;color:var(--orange);margin:.5rem 0 .3rem">Missing from ASPA Declaration (' + missingList.length + ')</div>';
+    missingList.slice(0, LIMIT).forEach(function(m) {
       h += '<div class="audit-row audit-missing">';
       h += '<span style="font-weight:600">' + asnLink(m.asn) + '</span>';
       if (m.name && m.name !== 'AS' + m.asn) h += ' <span style="color:var(--muted)">' + escHtml(m.name) + '</span>';
       h += ' <span class="badge badge-orange">seen in ' + (m.frequency_pct || 0) + '% of paths (' + (m.frequency || 0) + ')</span>';
       h += '</div>';
     });
+    if (missingList.length > LIMIT) {
+      var moreId = 'missingMore' + Date.now();
+      h += '<div id="' + moreId + '" style="display:none">';
+      missingList.slice(LIMIT).forEach(function(m) {
+        h += '<div class="audit-row audit-missing">';
+        h += '<span style="font-weight:600">' + asnLink(m.asn) + '</span>';
+        if (m.name && m.name !== 'AS' + m.asn) h += ' <span style="color:var(--muted)">' + escHtml(m.name) + '</span>';
+        h += ' <span class="badge badge-orange">seen in ' + (m.frequency_pct || 0) + '% of paths (' + (m.frequency || 0) + ')</span>';
+        h += '</div>';
+      });
+      h += '</div>';
+      h += '<div class="show-more-btn" onclick="var el=document.getElementById(\'' + moreId + '\');if(el.style.display===\'none\'){el.style.display=\'block\';this.textContent=\'Hide ' + (missingList.length - LIMIT) + ' entries\';}else{el.style.display=\'none\';this.textContent=\'Show ' + (missingList.length - LIMIT) + ' more...\';}">Show ' + (missingList.length - LIMIT) + ' more...</div>';
+    }
   }
 
-  // Extra in ASPA
+  // Extra in ASPA (collapsible after 5)
   if (audit.extra_in_aspa && audit.extra_in_aspa.length > 0) {
-    h += '<div style="font-size:.8rem;font-weight:600;color:var(--cyan);margin:.5rem 0 .3rem">Extra in ASPA (not seen in paths)</div>';
-    audit.extra_in_aspa.forEach(function(e) {
+    var extraList = audit.extra_in_aspa;
+    h += '<div style="font-size:.8rem;font-weight:600;color:var(--cyan);margin:.5rem 0 .3rem">Extra in ASPA (not seen in paths) (' + extraList.length + ')</div>';
+    extraList.slice(0, LIMIT).forEach(function(e) {
       h += '<div class="audit-row audit-extra">';
       h += '<span style="font-weight:600">' + asnLink(e.asn) + '</span>';
+      if (e.name && e.name !== 'AS' + e.asn) h += ' <span style="color:var(--muted)">' + escHtml(e.name) + '</span>';
       h += ' <span class="badge badge-cyan">not seen in any path</span>';
       h += '</div>';
     });
+    if (extraList.length > LIMIT) {
+      var extraMoreId = 'extraMore' + Date.now();
+      h += '<div id="' + extraMoreId + '" style="display:none">';
+      extraList.slice(LIMIT).forEach(function(e) {
+        h += '<div class="audit-row audit-extra">';
+        h += '<span style="font-weight:600">' + asnLink(e.asn) + '</span>';
+        if (e.name && e.name !== 'AS' + e.asn) h += ' <span style="color:var(--muted)">' + escHtml(e.name) + '</span>';
+        h += ' <span class="badge badge-cyan">not seen in any path</span>';
+        h += '</div>';
+      });
+      h += '</div>';
+      h += '<div class="show-more-btn" onclick="var el=document.getElementById(\'' + extraMoreId + '\');if(el.style.display===\'none\'){el.style.display=\'block\';this.textContent=\'Hide ' + (extraList.length - LIMIT) + ' entries\';}else{el.style.display=\'none\';this.textContent=\'Show ' + (extraList.length - LIMIT) + ' more...\';}">Show ' + (extraList.length - LIMIT) + ' more...</div>';
+    }
   }
 
   if ((!audit.missing_from_aspa || audit.missing_from_aspa.length === 0) && (!audit.extra_in_aspa || audit.extra_in_aspa.length === 0)) {
