@@ -23,7 +23,10 @@ try {
 const BGPROUTES_API_KEY = process.env.BGPROUTES_API_KEY || "";
 const BGPROUTES_API_URL = process.env.BGPROUTES_API_URL || "https://api.bgproutes.io/v1";
 
-const UA = "PeerCortex/0.5.0 (https://github.com/renefichtmueller/PeerCortex)";
+const PEERINGDB_API_KEY = process.env.PEERINGDB_API_KEY || "";
+const PEERINGDB_API_URL = process.env.PEERINGDB_API_URL || "https://www.peeringdb.com/api";
+
+const UA = "PeerCortex/0.5.0 (+https://peercortex.org; contact: rene.fichtmueller@flexoptix.net)";
 
 // ============================================================
 // Task 6: In-memory cache with TTL + Rate Limiting
@@ -119,6 +122,41 @@ function lookupAspaFromRpki(asn) {
 }
 
 
+
+// PeeringDB authenticated fetch helper
+function fetchPeeringDB(path, options) {
+  const url = PEERINGDB_API_URL + path;
+  const headers = { "User-Agent": UA };
+  if (PEERINGDB_API_KEY) {
+    headers["Authorization"] = "Api-Key " + PEERINGDB_API_KEY;
+  }
+  return fetchJSON(url, { ...options, headers: { ...(options && options.headers || {}), ...headers } });
+}
+
+// bgproutes.io visibility fallback helper
+// Queries the RIB endpoint to estimate prefix visibility across vantage points
+function fetchBgproutesVisibility(prefix) {
+  if (!BGPROUTES_API_KEY) return Promise.resolve(null);
+  const url = BGPROUTES_API_URL + "/rib?prefix=" + encodeURIComponent(prefix) + "&prefix_match=exact";
+  return fetchJSON(url, {
+    timeout: 15000,
+    headers: {
+      "Authorization": "Bearer " + BGPROUTES_API_KEY,
+      "User-Agent": UA,
+    },
+  }).then(function(data) {
+    if (!data || !data.data) return null;
+    // data.data should be an array of RIB entries from different vantage points
+    var entries = Array.isArray(data.data) ? data.data : (data.data.entries || data.data.routes || []);
+    var vpSet = new Set();
+    entries.forEach(function(e) {
+      if (e.vantage_point || e.vp || e.collector || e.peer_asn) {
+        vpSet.add(e.vantage_point || e.vp || e.collector || e.peer_asn);
+      }
+    });
+    return { vps_seeing: vpSet.size, total_entries: entries.length, source: "bgproutes.io" };
+  }).catch(function() { return null; });
+}
 
 // Rate limiting: max 60 requests per minute per IP
 const rateLimitMap = new Map();
@@ -1161,7 +1199,7 @@ const server = http.createServer(async (req, res) => {
       // Phase 1: Fetch core data needed by multiple validations
       const [prefixData, pdbNet, neighbourData, overviewData] = await Promise.all([
         fetchJSON("https://stat.ripe.net/data/announced-prefixes/data.json?resource=AS" + rawAsn, { timeout: 30000 }),
-        fetchJSON("https://www.peeringdb.com/api/net?asn=" + rawAsn),
+        fetchPeeringDB("/net?asn=" + rawAsn),
         fetchJSON("https://stat.ripe.net/data/asn-neighbours/data.json?resource=AS" + rawAsn, { timeout: 30000 }),
         fetchJSON("https://stat.ripe.net/data/as-overview/data.json?resource=AS" + rawAsn),
       ]);
@@ -1320,6 +1358,19 @@ const server = http.createServer(async (req, res) => {
         var seenBy = visibilities.filter(function(v) { return (v.rrcs_seeing || v.ipv4_full_table_peer_count || 0) > 0; }).length;
         var score = totalRrcs > 0 ? Math.round((seenBy / totalRrcs) * 100) : 0;
         var history = histData && histData.data && histData.data.by_origin ? histData.data.by_origin : [];
+        // If RIPE Stat returned no data, try bgproutes.io fallback
+        if (totalRrcs === 0 && samplePrefixes[0]) {
+          return fetchBgproutesVisibility(samplePrefixes[0]).then(function(bgprFb) {
+            if (bgprFb && bgprFb.vps_seeing > 0) {
+              seenBy = bgprFb.vps_seeing;
+              totalRrcs = Math.max(bgprFb.vps_seeing, 300);
+              score = Math.round((seenBy / totalRrcs) * 100);
+            }
+            return { status: score >= 80 ? "pass" : score >= 50 ? "warning" : "fail", visibility_score: score, total_rrcs: totalRrcs, seen_by: seenBy, origin_changes: history.length, sample_prefix: samplePrefixes[0] || null };
+          }).catch(function() {
+            return { status: score >= 80 ? "pass" : score >= 50 ? "warning" : "fail", visibility_score: score, total_rrcs: totalRrcs, seen_by: seenBy, origin_changes: history.length, sample_prefix: samplePrefixes[0] || null };
+          });
+        }
         return { status: score >= 80 ? "pass" : score >= 50 ? "warning" : "fail", visibility_score: score, total_rrcs: totalRrcs, seen_by: seenBy, origin_changes: history.length, sample_prefix: samplePrefixes[0] || null };
       }).catch(function(e) { return { status: "error", error: String(e) }; });
 
@@ -1374,7 +1425,7 @@ const server = http.createServer(async (req, res) => {
 
       // 22. IXP Route Server Participation
       if (netId) {
-        validationPromises.ix_route_server = fetchJSON("https://www.peeringdb.com/api/netixlan?net_id=" + netId).then(function(ixData) {
+        validationPromises.ix_route_server = fetchPeeringDB("/netixlan?net_id=" + netId).then(function(ixData) {
           var connections = ixData && ixData.data ? ixData.data : [];
           var rsParticipants = connections.filter(function(c) { return c.is_rs_peer === true; });
           return { status: connections.length > 0 && rsParticipants.length > 0 ? "pass" : "warning", total_ix_connections: connections.length, rs_peer_count: rsParticipants.length, rs_peer_pct: connections.length > 0 ? Math.round((rsParticipants.length / connections.length) * 100) : 0 };
@@ -1393,7 +1444,7 @@ const server = http.createServer(async (req, res) => {
 
       // Geolocation cross-ref with PeeringDB facilities
       var facCountriesPromise = netId
-        ? fetchJSON("https://www.peeringdb.com/api/netfac?net_id=" + netId).then(function(facData) {
+        ? fetchPeeringDB("/netfac?net_id=" + netId).then(function(facData) {
             return (facData && facData.data ? facData.data : []).map(function(f) { return f.country; }).filter(Boolean);
           }).catch(function() { return []; })
         : Promise.resolve([]);
@@ -1498,7 +1549,7 @@ const server = http.createServer(async (req, res) => {
 
     try {
       // Phase 0: Get PDB net first (fast, <1s) to get net_id for IX/Fac queries
-      const pdbNet = await fetchJSON("https://www.peeringdb.com/api/net?asn=" + asn);
+      const pdbNet = await fetchPeeringDB("/net?asn=" + asn);
       const net = pdbNet?.data?.[0] || {};
       const netId = net.id;
 
@@ -1512,8 +1563,8 @@ const server = http.createServer(async (req, res) => {
         fetchBgpHeNet(asn),
         fetchJSON("https://stat.ripe.net/data/visibility/data.json?resource=AS" + asn, { timeout: 30000 }),
         fetchJSON("https://stat.ripe.net/data/prefix-size-distribution/data.json?resource=AS" + asn),
-        netId ? fetchJSON("https://www.peeringdb.com/api/netixlan?net_id=" + netId) : Promise.resolve(null),
-        netId ? fetchJSON("https://www.peeringdb.com/api/netfac?net_id=" + netId) : Promise.resolve(null),
+        netId ? fetchPeeringDB("/netixlan?net_id=" + netId) : Promise.resolve(null),
+        netId ? fetchPeeringDB("/netfac?net_id=" + netId) : Promise.resolve(null),
       ];
       const [prefixData, neighbourData, overviewData, rirData, atlasProbeData, bgpHeData, visibilityData, prefixSizeData, ixlanData, facData] = await Promise.all(promises);
 
@@ -1602,7 +1653,7 @@ const server = http.createServer(async (req, res) => {
       const duration = Date.now() - start;
 
       // Compute routing visibility and prefix size distribution
-      const routingInfo = (function() {
+      const routingInfo = await (async function() {
         const ipv4Prefixes = prefixes.filter(function(p) { return !p.prefix.includes(":"); });
         const ipv6Prefixes = prefixes.filter(function(p) { return p.prefix.includes(":"); });
         var ipv4VisAvg = 0, ipv6VisAvg = 0, totalRisPeersV4 = 0, totalRisPeersV6 = 0;
@@ -1626,10 +1677,28 @@ const server = http.createServer(async (req, res) => {
         });
         if (v4Total > 0) ipv4VisAvg = Math.round((v4Seeing / v4Total) * 1000) / 10;
         if (v6Total > 0) ipv6VisAvg = Math.round((v6Seeing / v6Total) * 1000) / 10;
-        // If visibility API timed out but we have prefixes, mark as -1 (= "data unavailable")
+        // If visibility API timed out but we have prefixes, try bgproutes.io fallback
         if (visTimedOut && prefixes.length > 0) {
-          ipv4VisAvg = -1;
-          ipv6VisAvg = -1;
+          var fallbackPrefix = prefixes.find(function(p) { return !p.prefix.includes(":"); });
+          if (!fallbackPrefix) fallbackPrefix = prefixes[0];
+          if (fallbackPrefix) {
+            var bgprFallback = await fetchBgproutesVisibility(fallbackPrefix.prefix);
+            if (bgprFallback && bgprFallback.vps_seeing > 0) {
+              // Estimate visibility: % of VPs seeing the prefix (assume ~300 total RIS-equivalent VPs)
+              var estimatedTotal = Math.max(bgprFallback.vps_seeing, 300);
+              ipv4VisAvg = Math.round((bgprFallback.vps_seeing / estimatedTotal) * 1000) / 10;
+              ipv6VisAvg = -1; // bgproutes fallback is per-prefix, not per-AF aggregate
+              totalRisPeersV4 = bgprFallback.vps_seeing;
+              console.log("[Visibility] RIPE Stat timed out, used bgproutes.io fallback for " + fallbackPrefix.prefix + ": " + bgprFallback.vps_seeing + " VPs seeing it");
+            } else {
+              ipv4VisAvg = -1;
+              ipv6VisAvg = -1;
+              console.log("[Visibility] RIPE Stat timed out and bgproutes.io fallback returned no data");
+            }
+          } else {
+            ipv4VisAvg = -1;
+            ipv6VisAvg = -1;
+          }
         }
         totalRisPeersV4 = v4Total;
         totalRisPeersV6 = v6Total;
@@ -1762,8 +1831,8 @@ const server = http.createServer(async (req, res) => {
       // ALL calls in parallel — single batch
       // Phase 1: Get PDB net objects + RIPE data
       const [pdb1, pdb2, nb1Data, nb2Data, pfx1Data, pfx2Data] = await Promise.all([
-        fetchJSON("https://www.peeringdb.com/api/net?asn=" + asn1),
-        fetchJSON("https://www.peeringdb.com/api/net?asn=" + asn2),
+        fetchPeeringDB("/net?asn=" + asn1),
+        fetchPeeringDB("/net?asn=" + asn2),
         fetchJSON("https://stat.ripe.net/data/asn-neighbours/data.json?resource=AS" + asn1, { timeout: 30000 }),
         fetchJSON("https://stat.ripe.net/data/asn-neighbours/data.json?resource=AS" + asn2, { timeout: 30000 }),
         fetchJSON("https://stat.ripe.net/data/announced-prefixes/data.json?resource=AS" + asn1, { timeout: 30000 }),
@@ -1777,10 +1846,10 @@ const server = http.createServer(async (req, res) => {
 
       // Phase 2: IX + Facility using net_id (Bug 1 fix: netfac requires net_id, not asn)
       const ixFacPromises = [];
-      ixFacPromises.push(netId1 ? fetchJSON("https://www.peeringdb.com/api/netixlan?net_id=" + netId1) : Promise.resolve(null));
-      ixFacPromises.push(netId2 ? fetchJSON("https://www.peeringdb.com/api/netixlan?net_id=" + netId2) : Promise.resolve(null));
-      ixFacPromises.push(netId1 ? fetchJSON("https://www.peeringdb.com/api/netfac?net_id=" + netId1) : Promise.resolve(null));
-      ixFacPromises.push(netId2 ? fetchJSON("https://www.peeringdb.com/api/netfac?net_id=" + netId2) : Promise.resolve(null));
+      ixFacPromises.push(netId1 ? fetchPeeringDB("/netixlan?net_id=" + netId1) : Promise.resolve(null));
+      ixFacPromises.push(netId2 ? fetchPeeringDB("/netixlan?net_id=" + netId2) : Promise.resolve(null));
+      ixFacPromises.push(netId1 ? fetchPeeringDB("/netfac?net_id=" + netId1) : Promise.resolve(null));
+      ixFacPromises.push(netId2 ? fetchPeeringDB("/netfac?net_id=" + netId2) : Promise.resolve(null));
       const [ix1Data, ix2Data, fac1Data, fac2Data] = await Promise.all(ixFacPromises);
 
       const ix1Set = new Set((ix1Data?.data || []).map((ix) => ix.ix_id));
@@ -1896,7 +1965,7 @@ const server = http.createServer(async (req, res) => {
     const start = Date.now();
     try {
       // Search for IX by name
-      const ixSearch = await fetchJSON("https://www.peeringdb.com/api/ix?name__contains=" + encodeURIComponent(ixName));
+      const ixSearch = await fetchPeeringDB("/ix?name__contains=" + encodeURIComponent(ixName));
       const ixResults = ixSearch?.data || [];
       if (ixResults.length === 0) {
         return res.end(JSON.stringify({ error: "No IX found matching: " + ixName, matches: [] }));
@@ -1907,7 +1976,7 @@ const server = http.createServer(async (req, res) => {
       const ixId = ix.id;
 
       // Get ixlan for this IX
-      const ixlanData = await fetchJSON("https://www.peeringdb.com/api/ixlan?ix_id=" + ixId);
+      const ixlanData = await fetchPeeringDB("/ixlan?ix_id=" + ixId);
       const ixlans = ixlanData?.data || [];
       if (ixlans.length === 0) {
         return res.end(JSON.stringify({ ix: { id: ixId, name: ix.name }, matches: [] }));
@@ -1916,7 +1985,7 @@ const server = http.createServer(async (req, res) => {
       const ixlanId = ixlans[0].id;
 
       // Get all networks at this IX
-      const netixlanData = await fetchJSON("https://www.peeringdb.com/api/netixlan?ixlan_id=" + ixlanId);
+      const netixlanData = await fetchPeeringDB("/netixlan?ixlan_id=" + ixlanId);
       const netixlans = netixlanData?.data || [];
 
       // Get unique net_ids
@@ -1928,7 +1997,7 @@ const server = http.createServer(async (req, res) => {
       for (let i = 0; i < Math.min(netIds.length, 200); i += batchSize) {
         const batch = netIds.slice(i, i + batchSize);
         const batchResults = await Promise.all(
-          batch.map(nid => fetchJSON("https://www.peeringdb.com/api/net/" + nid))
+          batch.map(nid => fetchPeeringDB("/net/" + nid))
         );
         batchResults.forEach(r => {
           if (r?.data?.[0]) networks.push(r.data[0]);
@@ -2004,8 +2073,18 @@ const server = http.createServer(async (req, res) => {
       const firstSeen = routingStatus?.data?.first_seen?.time || null;
       const rpkiStatus = rpkiValid?.data?.status || "unknown";
       const rpkiRoas = rpkiValid?.data?.validating_roas || [];
-      const visData = visibility?.data?.visibilities || [];
-      const risPeersSeeingIt = visData.length > 0 ? visData.filter(v => v.ris_peers_seeing > 0).length : 0;
+      var visData = visibility?.data?.visibilities || [];
+      var risPeersSeeingIt = visData.length > 0 ? visData.filter(v => v.ris_peers_seeing > 0).length : 0;
+      var visibilitySource = "ripe_stat";
+      // bgproutes.io fallback if RIPE Stat visibility returned no data
+      if (visData.length === 0 && BGPROUTES_API_KEY) {
+        var bgprVis = await fetchBgproutesVisibility(prefix);
+        if (bgprVis && bgprVis.vps_seeing > 0) {
+          risPeersSeeingIt = bgprVis.vps_seeing;
+          visData = []; // keep empty, use risPeersSeeingIt
+          visibilitySource = "bgproutes.io";
+        }
+      }
 
       // Try to get IRR data
       let irrStatus = "unknown";
@@ -2022,7 +2101,7 @@ const server = http.createServer(async (req, res) => {
         origins: origins.map(o => ({ asn: o.asn, prefix: o.prefix })),
         rpki: { status: rpkiStatus, validating_roas: rpkiRoas.length },
         irr_status: irrStatus,
-        visibility: { ris_peers_seeing: risPeersSeeingIt, total_probes: visData.length },
+        visibility: { ris_peers_seeing: risPeersSeeingIt, total_probes: visData.length || risPeersSeeingIt, source: visibilitySource },
         first_seen: firstSeen,
       }, null, 2));
     } catch (err) {
@@ -2043,8 +2122,8 @@ const server = http.createServer(async (req, res) => {
     const start = Date.now();
     try {
       const [ixData, ixlanData] = await Promise.all([
-        fetchJSON("https://www.peeringdb.com/api/ix/" + ixId),
-        fetchJSON("https://www.peeringdb.com/api/ixlan?ix_id=" + ixId),
+        fetchPeeringDB("/ix/" + ixId),
+        fetchPeeringDB("/ixlan?ix_id=" + ixId),
       ]);
 
       const ix = ixData?.data?.[0] || {};
@@ -2053,7 +2132,7 @@ const server = http.createServer(async (req, res) => {
 
       let members = [];
       if (ixlanId) {
-        const netixlanData = await fetchJSON("https://www.peeringdb.com/api/netixlan?ixlan_id=" + ixlanId);
+        const netixlanData = await fetchPeeringDB("/netixlan?ixlan_id=" + ixlanId);
         members = (netixlanData?.data || []).map(m => ({
           asn: m.asn,
           name: m.name || "",
