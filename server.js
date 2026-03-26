@@ -1055,7 +1055,7 @@ const server = http.createServer(async (req, res) => {
       JSON.stringify({
         status: "ok",
         service: "PeerCortex",
-        version: "0.5.0-beta",
+        version: "0.5.0",
         timestamp: new Date().toISOString(),
         uptime_seconds: Math.floor(process.uptime()),
         bgproutes_configured: !!BGPROUTES_API_KEY,
@@ -2028,12 +2028,76 @@ const server = http.createServer(async (req, res) => {
         }))
         .sort((a, b) => b.speed_mbps - a.speed_mbps);
 
-      const facilities = (facData?.data || []).map((f) => ({
+      const facilitiesRaw = (facData?.data || []).map((f) => ({
         fac_id: f.fac_id,
         name: f.name || "",
         city: f.city || "",
         country: f.country || "",
       }));
+
+      // Batch-fetch facility coordinates for map (max 50 facilities)
+      const facIds = facilitiesRaw.map(f => f.fac_id).filter(Boolean).slice(0, 50);
+      let facCoordMap = {};
+      if (facIds.length > 0) {
+        try {
+          const chunks = [];
+          for (let i = 0; i < facIds.length; i += 25) chunks.push(facIds.slice(i, i + 25));
+          const coordResults = await Promise.race([
+            Promise.all(chunks.map(chunk =>
+              fetchPeeringDB("/fac?id__in=" + chunk.join(",") + "&fields=id,latitude,longitude").catch(() => null)
+            )),
+            new Promise(r => setTimeout(() => r([]), 5000))
+          ]);
+          (coordResults || []).forEach(res => {
+            (res?.data || []).forEach(f => { if (f.latitude && f.longitude) facCoordMap[f.id] = { lat: f.latitude, lon: f.longitude }; });
+          });
+        } catch(e) { /* graceful degradation */ }
+      }
+      const facilities = facilitiesRaw.map(f => ({
+        ...f,
+        latitude: facCoordMap[f.fac_id] ? facCoordMap[f.fac_id].lat : null,
+        longitude: facCoordMap[f.fac_id] ? facCoordMap[f.fac_id].lon : null,
+      }));
+
+      // Get IX locations for map via ixfac -> fac coordinates (max 20 IXs)
+      const uniqueIxIds = [...new Set(ixConnections.map(c => c.ix_id))].filter(Boolean).slice(0, 20);
+      let ixLocations = [];
+      if (uniqueIxIds.length > 0) {
+        try {
+          const ixFacData = await Promise.race([
+            fetchPeeringDB("/ixfac?ix_id__in=" + uniqueIxIds.join(",")),
+            new Promise(r => setTimeout(() => r(null), 5000))
+          ]);
+          const ixFacs = ixFacData?.data || [];
+          // Collect unique fac_ids we don't already have coords for
+          const extraFacIds = [...new Set(ixFacs.map(f => f.fac_id).filter(id => id && !facCoordMap[id]))].slice(0, 30);
+          if (extraFacIds.length > 0) {
+            const extraChunks = [];
+            for (let i = 0; i < extraFacIds.length; i += 25) extraChunks.push(extraFacIds.slice(i, i + 25));
+            const extraRes = await Promise.race([
+              Promise.all(extraChunks.map(chunk =>
+                fetchPeeringDB("/fac?id__in=" + chunk.join(",") + "&fields=id,latitude,longitude").catch(() => null)
+              )),
+              new Promise(r => setTimeout(() => r([]), 4000))
+            ]);
+            (extraRes || []).forEach(res => {
+              (res?.data || []).forEach(f => { if (f.latitude && f.longitude) facCoordMap[f.id] = { lat: f.latitude, lon: f.longitude }; });
+            });
+          }
+          // Build IX locations: pick first facility with coords per IX
+          const ixNameMap = {};
+          ixConnections.forEach(c => { if (c.ix_id && c.ix_name) ixNameMap[c.ix_id] = c.ix_name; });
+          const seenIx = {};
+          ixFacs.forEach(f => {
+            if (seenIx[f.ix_id]) return;
+            const coords = facCoordMap[f.fac_id];
+            if (coords) {
+              seenIx[f.ix_id] = true;
+              ixLocations.push({ ix_id: f.ix_id, name: ixNameMap[f.ix_id] || f.name || "", city: f.city || "", country: f.country || "", latitude: coords.lat, longitude: coords.lon });
+            }
+          });
+        } catch(e) { /* graceful degradation */ }
+      }
 
       const rpkiStatuses = rpkiAllResults;
       const rpkiValid = rpkiStatuses.filter((r) => r.status === "valid").length;
@@ -2227,7 +2291,7 @@ const server = http.createServer(async (req, res) => {
       const result = {
         meta: {
           service: "PeerCortex",
-          version: "0.5.0-beta",
+          version: "0.5.0",
           query: "AS" + asn,
           duration_ms: duration,
           sources: ["PeeringDB", "RIPE Stat", "bgp.he.net", "Cloudflare RPKI", "RIPE RPKI Validator", "Route Views"],
@@ -2284,6 +2348,7 @@ const server = http.createServer(async (req, res) => {
           unique_ixps: [...new Set(ixConnections.map((ix) => ix.ix_id))].length,
           connections: ixConnections,
         },
+        ix_locations: ixLocations,
         facilities: {
           total: facilities.length,
           list: facilities,
