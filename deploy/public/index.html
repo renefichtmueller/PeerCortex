@@ -225,6 +225,8 @@ a{color:var(--blue);text-decoration:none;transition:color .2s}a:hover{color:var(
 
 .show-more-btn{font-size:.8rem;color:var(--blue);cursor:pointer;padding:.5rem 0;margin-top:.25rem;transition:color .2s;user-select:none}
 .show-more-btn:hover{color:var(--cyan);text-decoration:underline}
+.sort-toggle{font-size:.7rem;color:var(--muted);cursor:pointer;padding:.2rem .5rem;border:1px solid var(--border);border-radius:4px;transition:all .2s;user-select:none}
+.sort-toggle:hover{color:var(--blue);border-color:var(--blue)}
 
 /* Routing Overview - Propagation Bars */
 .routing-stats-row{display:flex;gap:1rem;flex-wrap:wrap;margin-bottom:1.25rem}
@@ -530,6 +532,44 @@ function copyToClipboard(text, btn) {
     btn.textContent = 'Copied!';
     setTimeout(function() { btn.textContent = orig; }, 1500);
   });
+}
+
+function renderAuditList(containerId, list, sortBy, type) {
+  var sorted = list.slice();
+  if (sortBy === 'asn') sorted.sort(function(a, b) { return a.asn - b.asn; });
+  else if (sortBy === 'frequency') sorted.sort(function(a, b) { return (b.frequency || 0) - (a.frequency || 0); });
+  else if (sortBy === 'name') sorted.sort(function(a, b) { return (a.name || '').localeCompare(b.name || ''); });
+
+  var labelId = type === 'missing' ? 'missingSortLabel' : 'extraSortLabel';
+  var labelEl = document.getElementById(labelId);
+  if (labelEl) labelEl.textContent = sortBy === 'asn' ? 'by ASN' : sortBy === 'frequency' ? 'by frequency' : 'by name';
+
+  var LIMIT = 5;
+  var h = '';
+  sorted.slice(0, LIMIT).forEach(function(item) {
+    h += '<div class="audit-row audit-' + type + '">';
+    h += '<span style="font-weight:600">' + asnLink(item.asn) + '</span>';
+    if (item.name && item.name !== 'AS' + item.asn) h += ' <span style="color:var(--muted)">' + escHtml(item.name) + '</span>';
+    if (type === 'missing') h += ' <span class="badge badge-orange">seen in ' + (item.frequency_pct || 0) + '% of paths (' + (item.frequency || 0) + ')</span>';
+    else h += ' <span class="badge badge-cyan">not seen in any path</span>';
+    h += '</div>';
+  });
+  if (sorted.length > LIMIT) {
+    var moreId = containerId + 'More';
+    h += '<div id="' + moreId + '" style="display:none">';
+    sorted.slice(LIMIT).forEach(function(item) {
+      h += '<div class="audit-row audit-' + type + '">';
+      h += '<span style="font-weight:600">' + asnLink(item.asn) + '</span>';
+      if (item.name && item.name !== 'AS' + item.asn) h += ' <span style="color:var(--muted)">' + escHtml(item.name) + '</span>';
+      if (type === 'missing') h += ' <span class="badge badge-orange">seen in ' + (item.frequency_pct || 0) + '% of paths (' + (item.frequency || 0) + ')</span>';
+      else h += ' <span class="badge badge-cyan">not seen in any path</span>';
+      h += '</div>';
+    });
+    h += '</div>';
+    var remaining = sorted.length - LIMIT;
+    h += '<div class="show-more-btn" onclick="var el=document.getElementById(\'' + moreId + '\');if(el.style.display===\'none\'){el.style.display=\'block\';this.textContent=\'Hide ' + remaining + ' entries\';}else{el.style.display=\'none\';this.textContent=\'Show ' + remaining + ' more...\';}">Show ' + remaining + ' more...</div>';
+  }
+  document.getElementById(containerId).innerHTML = h;
 }
 
 async function doLookup() {
@@ -1197,57 +1237,26 @@ function renderAspaDeep(d) {
   h += '<div><span style="font-size:.7rem;color:var(--muted);text-transform:uppercase">Completeness</span><div style="font-size:1.3rem;font-weight:700;color:' + ((audit.completeness_pct || 0) >= 80 ? 'var(--green)' : 'var(--orange)') + '">' + (audit.completeness_pct || 0) + '%</div></div>';
   h += '</div>';
 
-  // Missing from ASPA (collapsible after 5)
+  // Missing from ASPA (collapsible, sortable)
   if (audit.missing_from_aspa && audit.missing_from_aspa.length > 0) {
-    var missingList = audit.missing_from_aspa;
-    var LIMIT = 5;
-    h += '<div style="font-size:.8rem;font-weight:600;color:var(--orange);margin:.5rem 0 .3rem">Missing from ASPA Declaration (' + missingList.length + ')</div>';
-    missingList.slice(0, LIMIT).forEach(function(m) {
-      h += '<div class="audit-row audit-missing">';
-      h += '<span style="font-weight:600">' + asnLink(m.asn) + '</span>';
-      if (m.name && m.name !== 'AS' + m.asn) h += ' <span style="color:var(--muted)">' + escHtml(m.name) + '</span>';
-      h += ' <span class="badge badge-orange">seen in ' + (m.frequency_pct || 0) + '% of paths (' + (m.frequency || 0) + ')</span>';
-      h += '</div>';
-    });
-    if (missingList.length > LIMIT) {
-      var moreId = 'missingMore' + Date.now();
-      h += '<div id="' + moreId + '" style="display:none">';
-      missingList.slice(LIMIT).forEach(function(m) {
-        h += '<div class="audit-row audit-missing">';
-        h += '<span style="font-weight:600">' + asnLink(m.asn) + '</span>';
-        if (m.name && m.name !== 'AS' + m.asn) h += ' <span style="color:var(--muted)">' + escHtml(m.name) + '</span>';
-        h += ' <span class="badge badge-orange">seen in ' + (m.frequency_pct || 0) + '% of paths (' + (m.frequency || 0) + ')</span>';
-        h += '</div>';
-      });
-      h += '</div>';
-      h += '<div class="show-more-btn" onclick="var el=document.getElementById(\'' + moreId + '\');if(el.style.display===\'none\'){el.style.display=\'block\';this.textContent=\'Hide ' + (missingList.length - LIMIT) + ' entries\';}else{el.style.display=\'none\';this.textContent=\'Show ' + (missingList.length - LIMIT) + ' more...\';}">Show ' + (missingList.length - LIMIT) + ' more...</div>';
-    }
+    window._auditMissing = audit.missing_from_aspa;
+    window._auditMissingSort = 'frequency';
+    h += '<div style="display:flex;align-items:center;gap:.75rem;margin:.5rem 0 .3rem">';
+    h += '<span style="font-size:.8rem;font-weight:600;color:var(--orange)">Missing from ASPA Declaration (' + audit.missing_from_aspa.length + ')</span>';
+    h += '<span class="sort-toggle" onclick="window._auditMissingSort=window._auditMissingSort===\'frequency\'?\'asn\':\'frequency\';renderAuditList(\'missingListEl\',window._auditMissing,window._auditMissingSort,\'missing\')" title="Toggle sort order">Sort: <span id="missingSortLabel">by frequency</span> ↕</span>';
+    h += '</div>';
+    h += '<div id="missingListEl"></div>';
   }
 
-  // Extra in ASPA (collapsible after 5)
+  // Extra in ASPA (collapsible, sortable)
   if (audit.extra_in_aspa && audit.extra_in_aspa.length > 0) {
-    var extraList = audit.extra_in_aspa;
-    h += '<div style="font-size:.8rem;font-weight:600;color:var(--cyan);margin:.5rem 0 .3rem">Extra in ASPA (not seen in paths) (' + extraList.length + ')</div>';
-    extraList.slice(0, LIMIT).forEach(function(e) {
-      h += '<div class="audit-row audit-extra">';
-      h += '<span style="font-weight:600">' + asnLink(e.asn) + '</span>';
-      if (e.name && e.name !== 'AS' + e.asn) h += ' <span style="color:var(--muted)">' + escHtml(e.name) + '</span>';
-      h += ' <span class="badge badge-cyan">not seen in any path</span>';
-      h += '</div>';
-    });
-    if (extraList.length > LIMIT) {
-      var extraMoreId = 'extraMore' + Date.now();
-      h += '<div id="' + extraMoreId + '" style="display:none">';
-      extraList.slice(LIMIT).forEach(function(e) {
-        h += '<div class="audit-row audit-extra">';
-        h += '<span style="font-weight:600">' + asnLink(e.asn) + '</span>';
-        if (e.name && e.name !== 'AS' + e.asn) h += ' <span style="color:var(--muted)">' + escHtml(e.name) + '</span>';
-        h += ' <span class="badge badge-cyan">not seen in any path</span>';
-        h += '</div>';
-      });
-      h += '</div>';
-      h += '<div class="show-more-btn" onclick="var el=document.getElementById(\'' + extraMoreId + '\');if(el.style.display===\'none\'){el.style.display=\'block\';this.textContent=\'Hide ' + (extraList.length - LIMIT) + ' entries\';}else{el.style.display=\'none\';this.textContent=\'Show ' + (extraList.length - LIMIT) + ' more...\';}">Show ' + (extraList.length - LIMIT) + ' more...</div>';
-    }
+    window._auditExtra = audit.extra_in_aspa;
+    window._auditExtraSort = 'asn';
+    h += '<div style="display:flex;align-items:center;gap:.75rem;margin:.5rem 0 .3rem">';
+    h += '<span style="font-size:.8rem;font-weight:600;color:var(--cyan)">Extra in ASPA (not seen in paths) (' + audit.extra_in_aspa.length + ')</span>';
+    h += '<span class="sort-toggle" onclick="window._auditExtraSort=window._auditExtraSort===\'asn\'?\'name\':\'asn\';renderAuditList(\'extraListEl\',window._auditExtra,window._auditExtraSort,\'extra\')" title="Toggle sort order">Sort: <span id="extraSortLabel">by ASN</span> ↕</span>';
+    h += '</div>';
+    h += '<div id="extraListEl"></div>';
   }
 
   if ((!audit.missing_from_aspa || audit.missing_from_aspa.length === 0) && (!audit.extra_in_aspa || audit.extra_in_aspa.length === 0)) {
@@ -1316,6 +1325,14 @@ function renderAspaDeep(d) {
 
   h += '<div style="font-size:.7rem;color:var(--dim);margin-top:.75rem">ASPA verification completed in ' + (d.meta ? d.meta.duration_ms : '?') + 'ms | ' + (d.meta ? d.meta.paths_analyzed : '?') + ' of ' + (d.meta ? d.meta.total_paths_seen : '?') + ' paths analyzed</div>';
   $('aspaDeepContent').innerHTML = h;
+
+  // Initial render of sortable audit lists
+  if (window._auditMissing && window._auditMissing.length > 0) {
+    renderAuditList('missingListEl', window._auditMissing, 'frequency', 'missing');
+  }
+  if (window._auditExtra && window._auditExtra.length > 0) {
+    renderAuditList('extraListEl', window._auditExtra, 'asn', 'extra');
+  }
 }
 
 
