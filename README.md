@@ -38,16 +38,21 @@
 <br/>
 
 <p align="center">
-  <img src="docs/screenshots/01-dashboard-overview.png" alt="PeerCortex Dashboard Overview — AS199121 Analysis" width="900" />
+  <a href="https://peercortex.org/?asn=13335">
+    <img src="docs/assets/demo.svg" alt="PeerCortex Dashboard Demo" width="900" />
+  </a>
 </p>
 
-<p align="center"><em>PeerCortex dashboard analyzing AS199121 — network overview, announced prefixes, RPKI compliance, and more</em></p>
+<p align="center">
+  <a href="https://peercortex.org/?asn=13335"><strong>Try the live dashboard at peercortex.org</strong></a>
+</p>
 
 ---
 
 ## Table of Contents
 
 - [What is PeerCortex?](#what-is-peercortex)
+- [What's New in v0.5.0](#whats-new-in-v050)
 - [The Problem](#the-problem)
 - [Web Dashboard](#web-dashboard)
   - [Network Overview](#network-overview)
@@ -74,6 +79,7 @@
 - [Architecture](#architecture)
 - [Privacy and Security](#privacy-and-security)
 - [ASPA Intelligence](#aspa-intelligence)
+  - [ASPA Verification](#aspa-verification-draft-ietf-sidrops-aspa-verification)
 - [Feature Comparison](#feature-comparison)
 - [Roadmap](#roadmap)
 - [Contributing](#contributing)
@@ -86,9 +92,9 @@
 
 PeerCortex is a **self-hosted network intelligence platform** that unifies data from PeeringDB, RIPE Stat, bgp.he.net, bgproutes.io, RIPE Atlas, IRR databases, and RPKI validators into a single interface. It ships as two components:
 
-1. **Web Dashboard** ([peercortex.org](https://peercortex.org)) — A live, interactive dashboard for instant ASN analysis with 12+ modules covering network overview, RPKI compliance, ASPA verification, health scoring, routing analysis, and more.
+1. **Web Dashboard** ([peercortex.org](https://peercortex.org)) — A live, interactive dashboard for instant ASN analysis with 12+ modules covering network overview, RPKI compliance, ASPA verification, health scoring, routing analysis, Route Views, and bgproutes.io integration.
 
-2. **MCP Server** — A Model Context Protocol server that exposes 25+ tools for AI-powered network analysis through Claude Code or any MCP-compatible client. Local Ollama inference means no data leaves your machine.
+2. **MCP Server** — A Model Context Protocol server that exposes **34 tools** for AI-powered network analysis through Claude Code or any MCP-compatible client. Local Ollama inference means no data leaves your machine.
 
 **Who uses PeerCortex?**
 
@@ -98,6 +104,23 @@ PeerCortex is a **self-hosted network intelligence platform** that unifies data 
 - **Security Teams** who track RPKI/ASPA compliance and identify route leaks
 - **RPKI Deployers** who need per-prefix validation status and coverage metrics
 - **ASPA Early Adopters** who want to generate ASPA objects and verify provider declarations
+
+---
+
+## What's New in v0.5.0
+
+| Feature | Description |
+|---------|-------------|
+| **RPKI-based ASPA Detection** | Ingests the Cloudflare RPKI JSON feed with 1,455+ ASPA objects worldwide for real-time provider authorization lookups |
+| **RFC-compliant ASPA Path Verification** | Implements draft-ietf-sidrops-aspa-verification: upstream/downstream validation and valley-free routing detection |
+| **Network Health Report** | 13 automated checks (bogon, ROA, IRR, blocklist, MANRS, visibility, rDNS, abuse contact, certificates, route servers, communities, geolocation, IRR quality) with a weighted 0-100 score |
+| **Route Views Integration** | AS path data from Oregon Route Views collectors via RIPE Stat for broader BGP visibility |
+| **bgproutes.io Integration** | 3,294+ vantage points with per-route ROV and ASPA validation status |
+| **RIPE Atlas Probe Detection** | Shows all Atlas probes and anchors hosted within an ASN |
+| **Collapsible Long Lists** | Show more/less toggles for provider lists, ASPA audit results, and IX listings |
+| **Numerical ASN Sorting** | Sortable ASPA audit lists by ASN number, frequency, or name |
+| **34 MCP Tools** | Expanded from 25+ to 34 tools covering ASPA, Atlas, security, traffic, and topology |
+| **12 REST API Endpoints** | Full dashboard API for headless integration and monitoring |
 
 ---
 
@@ -173,10 +196,8 @@ PeerCortex queries RPKI validators (local Routinator if available, RIPE RPKI val
 ### Network Health Report
 
 <p align="center">
-  <img src="docs/screenshots/02-health-report.png" alt="PeerCortex Health Report — 13 automated validation checks" width="900" />
+  <a href="https://peercortex.org/?asn=13335"><strong>See a live Health Report at peercortex.org</strong></a>
 </p>
-
-<p align="center"><em>Network Health Report with 13 automated checks and a weighted health score</em></p>
 
 The Network Health Report is one of the most comprehensive features in PeerCortex. It runs **13 independent validation checks** in parallel and calculates a weighted health score from 0 to 100:
 
@@ -218,10 +239,8 @@ This data comes directly from the RIPE Atlas API. Having Atlas probes in your ne
 ### ASPA Status
 
 <p align="center">
-  <img src="docs/screenshots/03-aspa-status.png" alt="PeerCortex ASPA Status — Provider Detection and ASPA Template" width="900" />
+  <a href="https://peercortex.org/?asn=199121"><strong>See a live ASPA analysis at peercortex.org</strong></a>
 </p>
-
-<p align="center"><em>ASPA Status with auto-detected upstream providers and a ready-to-submit ASPA object template</em></p>
 
 The ASPA (Autonomous System Provider Authorization) Status module performs BGP path analysis to determine the ASN's upstream providers and generates a recommended ASPA object:
 
@@ -240,10 +259,8 @@ This module is essential for operators preparing to deploy ASPA, as it automates
 ### ASPA Deep Analysis
 
 <p align="center">
-  <img src="docs/screenshots/04-aspa-deep-analysis.png" alt="PeerCortex ASPA Deep Analysis — RFC-compliant verification" width="900" />
+  <a href="https://peercortex.org/?asn=199121"><strong>See live ASPA Deep Analysis at peercortex.org</strong></a>
 </p>
-
-<p align="center"><em>ASPA Deep Analysis with readiness score gauge, upstream/downstream verification, valley detection, and path verification table</em></p>
 
 The ASPA Deep Analysis module goes beyond basic provider detection to provide a full RFC 9582-compliant verification:
 
@@ -286,10 +303,8 @@ The bgproutes.io integration provides a perspective from outside the RIPE RIS co
 ### Routing Overview
 
 <p align="center">
-  <img src="docs/screenshots/05-routing-overview.png" alt="PeerCortex Routing Overview — Neighbors, IXPs, and Facilities" width="900" />
+  <a href="https://peercortex.org/?asn=13335"><strong>See live Routing Overview at peercortex.org</strong></a>
 </p>
-
-<p align="center"><em>Routing overview showing neighbor relationships, IX participation with speeds, and facility presence</em></p>
 
 The Routing Overview section combines three related views:
 
@@ -357,7 +372,7 @@ Available through the MCP server's `peering` tool with AI-powered ranking via Ol
 
 ## MCP Server Tools
 
-PeerCortex exposes **25+ tools** via the Model Context Protocol. Each tool accepts structured input validated by Zod schemas and returns typed JSON responses.
+PeerCortex exposes **34 tools** via the Model Context Protocol. Each tool accepts structured input validated by Zod schemas and returns typed JSON responses.
 
 ### Core Tools
 
@@ -511,7 +526,7 @@ Path crosses DE-CIX Frankfurt at hop 4. No congestion detected.
 
 ## API Reference
 
-The PeerCortex web dashboard is powered by a REST API. All endpoints return JSON.
+The PeerCortex web dashboard is powered by a REST API with **12 endpoints**. All endpoints return JSON.
 
 ### Endpoints
 
@@ -575,6 +590,8 @@ PeerCortex aggregates network intelligence from multiple authoritative sources. 
 | **bgproutes.io** | [bgproutes.io](https://bgproutes.io/) | 3,294 vantage points, RIB entries, ROV + ASPA validation | API key |
 | **IRR Explorer** | [irrexplorer.nlnog.net](https://irrexplorer.nlnog.net/) | BGP vs IRR origin consistency checks | No |
 | **RIPE DB** | [rest.db.ripe.net](https://rest.db.ripe.net/) | Route objects, as-sets, aut-num, ASPA objects, WHOIS | No |
+| **Cloudflare RPKI JSON** | [rpki.cloudflare.com](https://rpki.cloudflare.com/) | Global ASPA object feed (1,455+ objects), ROA data, RPKI trust anchors | No |
+| **Route Views** | [routeviews.org](http://www.routeviews.org/) (via RIPE Stat) | AS paths from Oregon Route Views collectors, BGP table snapshots | No |
 | **RPKI Validators** | Local Routinator / RIPE RPKI | ROA validation, VRP list, resource certificates | No |
 | **MANRS Observatory** | [observatory.manrs.org](https://observatory.manrs.org/) | MANRS participation and conformance score | No |
 | **CAIDA AS Rank** | [asrank.caida.org](https://asrank.caida.org/) | AS relationships, customer cones, rankings | No |
@@ -768,7 +785,7 @@ docker run -d --name routinator -p 8323:8323 nlnetlabs/routinator
 
 | Component | Location | Description |
 |-----------|----------|-------------|
-| MCP Server | `src/mcp-server/` | Model Context Protocol server with 25+ tools |
+| MCP Server | `src/mcp-server/` | Model Context Protocol server with 34 tools |
 | Tool Handlers | `src/mcp-server/tools/` | Individual tool implementations with Zod schemas |
 | Data Sources | `src/sources/` | Client modules for each external API |
 | AI Layer | `src/ai/` | Ollama client with specialized prompt templates |
@@ -830,6 +847,20 @@ Each AS publishes an ASPA object declaring its authorized upstream providers. BG
 - ASPA provides cryptographic proof of provider relationships, complementing ROA validation
 - Together, ROA + ASPA address the two most critical BGP security gaps: origin validation and path validation
 - ASPA is effective against lateral ISS-ISS leaks and customer-to-provider leaks (RFC 7908)
+
+### ASPA Verification (draft-ietf-sidrops-aspa-verification)
+
+PeerCortex implements the ASPA path verification algorithm from **draft-ietf-sidrops-aspa-verification**, the active IETF draft that defines how BGP routers validate AS paths using ASPA objects. The implementation covers:
+
+| Verification Step | Description |
+|-------------------|-------------|
+| **Upstream verification** | For each hop in the AS path, checks whether the next-hop AS is listed as an authorized provider in the ASPA object of the current AS |
+| **Downstream verification** | Validates customer-to-provider direction by confirming the declaring AS appears as a customer in the provider's view |
+| **Valley-free check** | Detects valley violations (customer-to-provider followed by provider-to-customer through a different provider), which indicate route leaks per the Gao-Rexford model |
+| **AS_SET handling** | Flags paths containing AS_SET aggregation, which complicates ASPA validation and is discouraged by current best practices |
+| **Per-hop status** | Each hop in the path receives a validation result: Valid (authorized), Invalid (unauthorized), or Unknown (no ASPA object available) |
+
+PeerCortex fetches ASPA objects from the **Cloudflare RPKI JSON feed** (1,455+ ASPA objects worldwide as of March 2026) and cross-references with RIPE DB registrations. The verification runs against live BGP paths observed from RIPE RIS route collectors and bgproutes.io vantage points.
 
 ### ASPA Tools in PeerCortex
 

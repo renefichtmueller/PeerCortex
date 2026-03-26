@@ -1,6 +1,6 @@
 {
   "name": "peercortex",
-  "version": "0.1.0",
+  "version": "0.5.0",
   "description": "AI-Powered Network Intelligence Platform — MCP Server for PeeringDB, RIPE Stat, BGP analysis, RPKI monitoring, and peering automation. Powered by local Ollama.",
   "main": "dist/mcp-server/index.js",
   "types": "dist/mcp-server/index.d.ts",
