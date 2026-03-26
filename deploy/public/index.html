@@ -223,6 +223,27 @@ a{color:var(--blue);text-decoration:none;transition:color .2s}a:hover{color:var(
 .health-tooltip .tt-fix{color:#ff9e64;font-style:italic}
 .health-check-item:hover .health-tooltip{display:block}
 
+/* Routing Overview - Propagation Bars */
+.routing-stats-row{display:flex;gap:1rem;flex-wrap:wrap;margin-bottom:1.25rem}
+.routing-stat-card{flex:1;min-width:100px;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:.875rem 1rem;text-align:center}
+.routing-stat-val{font-size:1.6rem;font-weight:700;line-height:1.2}
+.routing-stat-label{font-size:.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-top:.25rem}
+.prop-section{margin-bottom:1rem}
+.prop-label{font-size:.8rem;font-weight:600;color:var(--text-dim);margin-bottom:.4rem}
+.prop-bar-wrap{display:flex;align-items:center;gap:.75rem}
+.prop-bar{flex:1;height:12px;border-radius:6px;background:#1e2030;overflow:hidden}
+.prop-fill{height:100%;border-radius:6px;transition:width 1.2s cubic-bezier(.4,0,.2,1);width:0}
+.prop-fill.green{background:linear-gradient(90deg,#9ece6a,#73daca)}
+.prop-fill.orange{background:linear-gradient(90deg,#e0af68,#ff9e64)}
+.prop-fill.red{background:linear-gradient(90deg,#f7768e,#db4b4b)}
+.prop-pct{font-size:.9rem;font-weight:700;min-width:50px;text-align:right}
+.prop-detail{font-size:.7rem;color:var(--muted);margin-top:.2rem}
+.prefix-dist{margin-top:1rem}
+.prefix-dist-label{font-size:.8rem;font-weight:600;color:var(--text-dim);margin-bottom:.5rem}
+.prefix-badges{display:flex;flex-wrap:wrap;gap:.4rem}
+.prefix-badge{font-size:.7rem;padding:.2rem .5rem;border-radius:4px;background:var(--bg);border:1px solid var(--border);color:var(--text-dim);font-family:'Inter',monospace}
+.routing-footer{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.75rem;margin-top:1rem;padding-top:.75rem;border-top:1px solid var(--border)}
+.routing-footer-left{display:flex;align-items:center;gap:.5rem;font-size:.8rem;color:var(--text-dim)}
 
 </style>
 </head>
@@ -1509,29 +1530,7 @@ function renderProviderGraph(asn, providers) {
   svg += '.' + uid + 'pnode:hover{transform:scale(1.18);filter:brightness(1.4) drop-shadow(0 0 8px rgba(122,162,247,.6))}';
   svg += '.' + uid + 'conn{transition:stroke-width .2s ease,stroke .2s ease}';
   svg += '.' + uid + 'pnode:hover~.' + uid + 'conn{stroke-width:3}';
-  svg += '
-/* Routing Overview - Propagation Bars */
-.routing-stats-row{display:flex;gap:1rem;flex-wrap:wrap;margin-bottom:1.25rem}
-.routing-stat-card{flex:1;min-width:100px;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:.875rem 1rem;text-align:center}
-.routing-stat-val{font-size:1.6rem;font-weight:700;line-height:1.2}
-.routing-stat-label{font-size:.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-top:.25rem}
-.prop-section{margin-bottom:1rem}
-.prop-label{font-size:.8rem;font-weight:600;color:var(--text-dim);margin-bottom:.4rem}
-.prop-bar-wrap{display:flex;align-items:center;gap:.75rem}
-.prop-bar{flex:1;height:12px;border-radius:6px;background:#1e2030;overflow:hidden}
-.prop-fill{height:100%;border-radius:6px;transition:width 1.2s cubic-bezier(.4,0,.2,1);width:0}
-.prop-fill.green{background:linear-gradient(90deg,#9ece6a,#73daca)}
-.prop-fill.orange{background:linear-gradient(90deg,#e0af68,#ff9e64)}
-.prop-fill.red{background:linear-gradient(90deg,#f7768e,#db4b4b)}
-.prop-pct{font-size:.9rem;font-weight:700;min-width:50px;text-align:right}
-.prop-detail{font-size:.7rem;color:var(--muted);margin-top:.2rem}
-.prefix-dist{margin-top:1rem}
-.prefix-dist-label{font-size:.8rem;font-weight:600;color:var(--text-dim);margin-bottom:.5rem}
-.prefix-badges{display:flex;flex-wrap:wrap;gap:.4rem}
-.prefix-badge{font-size:.7rem;padding:.2rem .5rem;border-radius:4px;background:var(--bg);border:1px solid var(--border);color:var(--text-dim);font-family:'Inter',monospace}
-.routing-footer{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.75rem;margin-top:1rem;padding-top:.75rem;border-top:1px solid var(--border)}
-.routing-footer-left{display:flex;align-items:center;gap:.5rem;font-size:.8rem;color:var(--text-dim)}
-</style>';
+  svg += '</style>';
 
   // ---- Orbit ring (subtle) ----
   svg += '<circle cx="' + cx + '" cy="' + cy + '" r="' + baseRadius + '" fill="none" stroke="#363b54" stroke-width="1" stroke-dasharray="3,6" opacity=".25">';
