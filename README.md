@@ -14,6 +14,11 @@
   <a href="#"><img alt="Self-hosted" src="https://img.shields.io/badge/Self--hosted-100%25%20Local-orange?style=flat-square" /></a>
   <a href="#"><img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-Strict-3178C6?style=flat-square&logo=typescript&logoColor=white" /></a>
   <a href="LICENSE"><img alt="MIT License" src="https://img.shields.io/badge/License-MIT-yellow?style=flat-square" /></a>
+  <a href="https://peercortex.org"><img alt="Live Demo" src="https://img.shields.io/badge/Live%20Demo-peercortex.org-9ece6a?style=flat-square" /></a>
+</p>
+
+<p align="center">
+  <strong>🌐 <a href="https://peercortex.org">Live Demo → peercortex.org</a></strong>
 </p>
 
 <p align="center">
