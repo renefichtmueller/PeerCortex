@@ -23,7 +23,7 @@ try {
 const BGPROUTES_API_KEY = process.env.BGPROUTES_API_KEY || "";
 const BGPROUTES_API_URL = process.env.BGPROUTES_API_URL || "https://api.bgproutes.io/v1";
 
-const UA = "PeerCortex/0.4.0 (https://github.com/renefichtmueller/PeerCortex)";
+const UA = "PeerCortex/0.5.0 (https://github.com/renefichtmueller/PeerCortex)";
 
 // ============================================================
 // Task 6: In-memory cache with TTL + Rate Limiting
@@ -55,6 +55,70 @@ const CACHE_TTL_LOOKUP = 5 * 60 * 1000;   // 5 minutes
 const CACHE_TTL_ASPA = 10 * 60 * 1000;    // 10 minutes
 const CACHE_TTL_NEWS = 10 * 60 * 1000;    // 10 minutes
 const CACHE_TTL_DEFAULT = 5 * 60 * 1000;  // 5 minutes
+
+// ============================================================
+// RPKI ASPA Cache from Cloudflare RPKI JSON feed
+// ============================================================
+const rpkiAspaMap = new Map(); // customer_asid -> Set<provider_asn>
+let rpkiAspaLastFetch = 0;
+let rpkiAspaFetching = false;
+
+function fetchRpkiAspaFeed() {
+  if (rpkiAspaFetching) return Promise.resolve();
+  rpkiAspaFetching = true;
+  console.log("[RPKI-ASPA] Fetching Cloudflare RPKI feed...");
+  return new Promise((resolve) => {
+    const options = {
+      headers: { "User-Agent": UA },
+      timeout: 30000,
+    };
+    https.get("https://rpki.cloudflare.com/rpki.json", options, (res) => {
+      let data = "";
+      res.on("data", (chunk) => (data += chunk));
+      res.on("end", () => {
+        try {
+          const parsed = JSON.parse(data);
+          const aspas = parsed.aspas || [];
+          rpkiAspaMap.clear();
+          aspas.forEach((a) => {
+            const customerAsid = Number(a.customer_asid);
+            const providers = (a.providers || []).map(Number);
+            rpkiAspaMap.set(customerAsid, new Set(providers));
+          });
+          rpkiAspaLastFetch = Date.now();
+          console.log("[RPKI-ASPA] Loaded " + rpkiAspaMap.size + " ASPA objects from Cloudflare RPKI feed");
+        } catch (e) {
+          console.error("[RPKI-ASPA] Failed to parse RPKI feed:", e.message);
+        }
+        rpkiAspaFetching = false;
+        resolve();
+      });
+    }).on("error", (e) => {
+      console.error("[RPKI-ASPA] Fetch failed:", e.message);
+      rpkiAspaFetching = false;
+      resolve();
+    });
+  });
+}
+
+// Ensure ASPA cache is fresh (fetch if older than 10 minutes)
+async function ensureAspaCache() {
+  if (Date.now() - rpkiAspaLastFetch > 10 * 60 * 1000) {
+    await fetchRpkiAspaFeed();
+  }
+}
+
+// Lookup ASPA object for a given ASN from the RPKI feed cache
+function lookupAspaFromRpki(asn) {
+  const asnNum = Number(asn);
+  if (rpkiAspaMap.has(asnNum)) {
+    const providers = rpkiAspaMap.get(asnNum);
+    return { exists: true, providers: [...providers].sort((a, b) => a - b) };
+  }
+  return { exists: false, providers: [] };
+}
+
+
 
 // Rate limiting: max 60 requests per minute per IP
 const rateLimitMap = new Map();
@@ -602,7 +666,7 @@ const server = http.createServer(async (req, res) => {
       JSON.stringify({
         status: "ok",
         service: "PeerCortex",
-        version: "0.3.0",
+        version: "0.5.0",
         timestamp: new Date().toISOString(),
         uptime_seconds: Math.floor(process.uptime()),
         bgproutes_configured: !!BGPROUTES_API_KEY,
@@ -690,36 +754,29 @@ const server = http.createServer(async (req, res) => {
         }
       });
 
-      // Check RIPE DB for ASPA object
-      let aspaObjectExists = false;
-      let aspaDeclaredProviders = [];
-      try {
-        const ripeDbInfo = await fetchJSON(
-          "https://rest.db.ripe.net/search.json?query-string=AS" +
-            rawAsn +
-            "&type-filter=aut-num&source=ripe"
-        );
-        const objects = ripeDbInfo?.objects?.object || [];
-        objects.forEach((obj) => {
-          const attrs = obj.attributes?.attribute || [];
-          attrs.forEach((attr) => {
-            if (attr.name === "remarks" && attr.value && attr.value.toLowerCase().includes("aspa")) {
-              aspaObjectExists = true;
-            }
-            if (attr.name === "import" || attr.name === "mp-import") {
-              const match = (attr.value || "").match(/from\s+AS(\d+)/i);
-              if (match) {
-                aspaDeclaredProviders.push(parseInt(match[1]));
-              }
-            }
-          });
-        });
-      } catch (_e) {
-        // RIPE DB query failed
-      }
+      // Check Cloudflare RPKI feed for ASPA object
+      await ensureAspaCache();
+      const aspaLookup = lookupAspaFromRpki(targetAsn);
+      const aspaObjectExists = aspaLookup.exists;
+      const aspaDeclaredProviders = aspaLookup.providers;
 
-      // Build ASPA store and run verification
-      const aspaStore = buildAspaStore(detectedProviders, targetAsn);
+      // Build ASPA store from RPKI feed data (real ASPA objects)
+      const aspaStore = new Map();
+      // Add the target ASN's RPKI-declared providers
+      if (aspaObjectExists) {
+        aspaStore.set(targetAsn, new Set(aspaDeclaredProviders));
+      } else {
+        // Fallback: use detected providers for path verification
+        const providerSet = new Set(detectedProviders.map((p) => p.asn));
+        aspaStore.set(targetAsn, providerSet);
+      }
+      // Also populate store with all known ASPA objects from the RPKI feed
+      // for providers that have their own ASPA objects (enables full path verification)
+      for (const [cas, provSet] of rpkiAspaMap) {
+        if (!aspaStore.has(cas)) {
+          aspaStore.set(cas, provSet);
+        }
+      }
 
       // Also add reverse relationships for providers we know about
       // (each provider has the target as customer)
@@ -913,26 +970,14 @@ const server = http.createServer(async (req, res) => {
 
       await resolveASNames(detectedProviders);
 
-      let aspaObjectExists = false;
-      try {
-        const ripeDbInfo = await fetchJSON(
-          "https://rest.db.ripe.net/search.json?query-string=AS" +
-            rawAsn +
-            "&type-filter=aut-num&source=ripe"
-        );
-        const objects = ripeDbInfo?.objects?.object || [];
-        objects.forEach((obj) => {
-          const attrs = obj.attributes?.attribute || [];
-          attrs.forEach((attr) => {
-            if (attr.name === "remarks" && attr.value && attr.value.toLowerCase().includes("aspa")) {
-              aspaObjectExists = true;
-            }
-          });
-        });
-      } catch (_e) {}
+      // Check Cloudflare RPKI feed for ASPA object
+      await ensureAspaCache();
+      const aspaLookup = lookupAspaFromRpki(rawAsn);
+      const aspaObjectExists = aspaLookup.exists;
+      const aspaDeclaredProviders = aspaLookup.providers;
 
       const providerList = detectedProviders.map((p) => "AS" + p.asn).join(", ");
-      const recommendedAspa =
+      let recommendedAspa =
         "aut-num:        AS" + rawAsn + "\n" +
         "# Recommended ASPA object:\n" +
         "# customer:     AS" + rawAsn + "\n" +
@@ -941,6 +986,12 @@ const server = http.createServer(async (req, res) => {
         "#\n" +
         "# Detected providers from BGP path analysis:\n" +
         detectedProviders.map((p) => "#   AS" + p.asn + (p.name ? " (" + p.name + ")" : "")).join("\n");
+
+      // If ASPA object exists, show RPKI-declared providers
+      if (aspaObjectExists && aspaDeclaredProviders.length > 0) {
+        recommendedAspa += "\n#\n# RPKI-declared providers (from Cloudflare RPKI feed):\n" +
+          aspaDeclaredProviders.map((a) => "#   AS" + a).join("\n");
+      }
 
       const samplePaths = asPaths.slice(0, 10).map((p) => {
         const pathStr = p.path.map((a) => "AS" + a).join(" -> ");
@@ -964,6 +1015,8 @@ const server = http.createServer(async (req, res) => {
             detected_providers: detectedProviders,
             provider_count: detectedProviders.length,
             aspa_object_exists: aspaObjectExists,
+            aspa_declared_providers: aspaDeclaredProviders.map((a) => ({ asn: a })),
+            aspa_declared_count: aspaDeclaredProviders.length,
             recommended_aspa: recommendedAspa,
             path_analysis: {
               total_paths_seen: asPaths.length,
@@ -1597,10 +1650,10 @@ const server = http.createServer(async (req, res) => {
       const result = {
         meta: {
           service: "PeerCortex",
-          version: "0.3.0",
+          version: "0.5.0",
           query: "AS" + asn,
           duration_ms: duration,
-          sources: ["PeeringDB", "RIPE Stat", "bgp.he.net"],
+          sources: ["PeeringDB", "RIPE Stat", "bgp.he.net", "Cloudflare RPKI", "Route Views"],
           timestamp: new Date().toISOString(),
           rpki_prefixes_checked: rpkiTotal,
           total_prefixes: prefixes.length,
@@ -2081,7 +2134,17 @@ const server = http.createServer(async (req, res) => {
 });
 
 const PORT = process.env.PORT || 3101;
-server.listen(PORT, "0.0.0.0", () => {
-  console.log("PeerCortex v0.3.0 running on http://0.0.0.0:" + PORT);
-  console.log("bgproutes.io API key: " + (BGPROUTES_API_KEY ? "configured" : "NOT configured"));
+
+// Fetch RPKI ASPA feed at startup and refresh every 10 minutes
+fetchRpkiAspaFeed().then(() => {
+  server.listen(PORT, "0.0.0.0", () => {
+    console.log("PeerCortex v0.4.0 running on http://0.0.0.0:" + PORT);
+    console.log("bgproutes.io API key: " + (BGPROUTES_API_KEY ? "configured" : "NOT configured"));
+    console.log("RPKI ASPA objects loaded: " + rpkiAspaMap.size);
+  });
 });
+
+// Refresh RPKI ASPA cache every 10 minutes
+setInterval(() => {
+  fetchRpkiAspaFeed();
+}, 10 * 60 * 1000);

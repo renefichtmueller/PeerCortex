@@ -483,9 +483,9 @@ a{color:var(--blue);text-decoration:none;transition:color .2s}a:hover{color:var(
     <a href="https://bgp.he.net" target="_blank">bgp.he.net</a> &middot;
     <a href="https://bgproutes.io" target="_blank">bgproutes.io</a> &middot;
     <a href="https://www.ripe.net/manage-ips-and-asns/db" target="_blank">RIPE DB</a> &middot;
-    <a href="https://rpki-validator.ripe.net" target="_blank">RPKI</a>
+    <a href="https://rpki.cloudflare.com" target="_blank">Cloudflare RPKI</a>
   </div>
-  PeerCortex v0.4.0 &mdash; Open Source &mdash; MIT License<br>
+  PeerCortex v0.5.0 &mdash; Open Source &mdash; MIT License<br>
   <a href="https://github.com/renefichtmueller/PaperCortex" target="_blank">PaperCortex</a> &middot;
   <a href="https://github.com/renefichtmueller/PeerCortex" target="_blank">PeerCortex GitHub</a>
 </footer>
@@ -653,11 +653,16 @@ function renderAspa(d) {
   h += '<div style="display:flex;gap:2rem;flex-wrap:wrap;margin-bottom:1rem">';
   h += '<div><div style="font-size:.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.25rem">ASPA Object</div>';
   if (d.aspa_object_exists) {
-    h += '<div class="status-yes">Found in RIPE DB</div>';
+    h += '<div class="status-yes">Found in RPKI</div>';
   } else {
     h += '<div class="status-no">Not Found</div>';
   }
   h += '</div>';
+  if (d.aspa_object_exists && d.aspa_declared_providers && d.aspa_declared_providers.length > 0) {
+    h += '<div><div style="font-size:.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.25rem">RPKI-Declared Providers</div>';
+    h += '<div style="font-size:1.5rem;font-weight:700;color:var(--green)">' + d.aspa_declared_count + '</div>';
+    h += '</div>';
+  }
   h += '<div><div style="font-size:.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.25rem">Detected Providers</div>';
   h += '<div style="font-size:1.5rem;font-weight:700;color:var(--blue)">' + d.provider_count + '</div>';
   h += '</div>';
@@ -669,7 +674,7 @@ function renderAspa(d) {
   // Detected providers (collapsible after 10)
   if (d.detected_providers && d.detected_providers.length > 0) {
     var provLimit = 10;
-    var provList = d.detected_providers;
+    var provList = d.detected_providers.slice().sort(function(a, b) { return a.asn - b.asn; });
     h += '<div style="font-size:.8rem;font-weight:600;color:var(--orange);margin:.75rem 0 .4rem">Detected Upstream Providers (' + provList.length + ')</div>';
     h += '<div style="display:flex;flex-wrap:wrap;gap:.3rem;margin-bottom:.25rem">';
     provList.slice(0, provLimit).forEach(function(p) {
@@ -687,6 +692,18 @@ function renderAspa(d) {
       h += '</div>';
       h += '<div class="show-more-btn" onclick="var el=document.getElementById(\'' + provMoreId + '\');if(el.style.display===\'none\'){el.style.display=\'flex\';this.textContent=\'Hide ' + (provList.length - provLimit) + ' providers\';}else{el.style.display=\'none\';this.textContent=\'Show ' + (provList.length - provLimit) + ' more providers...\';}">Show ' + (provList.length - provLimit) + ' more providers...</div>';
     }
+  }
+
+  // RPKI-declared providers (when ASPA object exists)
+  if (d.aspa_object_exists && d.aspa_declared_providers && d.aspa_declared_providers.length > 0) {
+    var declaredList = d.aspa_declared_providers.slice().sort(function(a, b) { return a.asn - b.asn; });
+    h += '<div style="font-size:.8rem;font-weight:600;color:var(--green);margin:.75rem 0 .4rem">RPKI-Declared Providers (' + declaredList.length + ')</div>';
+    h += '<div style="display:flex;flex-wrap:wrap;gap:.3rem;margin-bottom:.25rem">';
+    declaredList.forEach(function(p) {
+      var label = p.asn === 0 ? 'AS0 (Tier-1 / No Provider)' : asnLink(p.asn);
+      h += '<span class="badge badge-green">' + label + '</span>';
+    });
+    h += '</div>';
   }
 
   // Recommended ASPA template (scrollable, max 200px)
@@ -1268,7 +1285,7 @@ function renderAspaDeep(d) {
   if (d.detected_providers && d.detected_providers.length > 0) {
     h += '<div style="margin-top:1.25rem"><div style="font-size:.85rem;font-weight:600;color:var(--blue);margin-bottom:.5rem">Detected Providers (by frequency)</div>';
     h += '<div class="scroll-wrap" style="max-height:200px"><table class="tbl"><thead><tr><th>Provider</th><th>Name</th><th>Seen in Paths</th><th>Frequency</th></tr></thead><tbody>';
-    var sortedProviders = (d.detected_providers || []).slice().sort(function(a, b) { return (b.frequency || 0) - (a.frequency || 0); });
+    var sortedProviders = (d.detected_providers || []).slice().sort(function(a, b) { return (b.frequency || 0) - (a.frequency || 0) || a.asn - b.asn; });
     sortedProviders.forEach(function(p) {
       h += '<tr><td>' + asnLink(p.asn) + '</td>';
       var provName = (p.name && p.name !== 'AS' + p.asn) ? escHtml(p.name) : '';
