@@ -273,6 +273,7 @@ a{color:var(--blue);text-decoration:none;transition:color .2s}a:hover{color:var(
     <a href="https://stat.ripe.net" target="_blank">RIPE Stat</a>
     <a href="https://bgp.he.net" target="_blank">bgp.he.net</a>
     <a href="https://atlas.ripe.net" target="_blank">RIPE Atlas</a>
+    <a href="https://www.routeviews.org" target="_blank">Route Views</a>
     <a href="https://bgproutes.io" target="_blank">bgproutes.io</a>
   </nav>
 </div>
@@ -471,9 +472,20 @@ a{color:var(--blue);text-decoration:none;transition:color .2s}a:hover{color:var(
 
 <!-- Footer -->
 <footer class="footer">
-  PeerCortex v0.3.0 &mdash; Open Source &mdash; MIT License<br>
+  <div style="margin-bottom:.75rem;font-size:.7rem;color:var(--dim)">
+    Data powered by
+    <a href="https://www.peeringdb.com" target="_blank">PeeringDB</a> &middot;
+    <a href="https://stat.ripe.net" target="_blank">RIPE Stat</a> &middot;
+    <a href="https://atlas.ripe.net" target="_blank">RIPE Atlas</a> &middot;
+    <a href="https://www.routeviews.org" target="_blank">Route Views</a> &middot;
+    <a href="https://bgp.he.net" target="_blank">bgp.he.net</a> &middot;
+    <a href="https://bgproutes.io" target="_blank">bgproutes.io</a> &middot;
+    <a href="https://www.ripe.net/manage-ips-and-asns/db" target="_blank">RIPE DB</a> &middot;
+    <a href="https://rpki-validator.ripe.net" target="_blank">RPKI</a>
+  </div>
+  PeerCortex v0.4.0 &mdash; Open Source &mdash; MIT License<br>
   <a href="https://github.com/renefichtmueller/PaperCortex" target="_blank">PaperCortex</a> &middot;
-  <a href="https://github.com/peercortex/peercortex" target="_blank">PeerCortex GitHub</a>
+  <a href="https://github.com/renefichtmueller/PeerCortex" target="_blank">PeerCortex GitHub</a>
 </footer>
 
 <script>
@@ -745,6 +757,7 @@ function renderDashboard(d) {
   if (n.peeringdb_id) ov += '<a class="ext-link" href="https://www.peeringdb.com/net/' + n.peeringdb_id + '" target="_blank">PeeringDB</a>';
   ov += '<a class="ext-link" href="https://bgp.he.net/AS' + n.asn + '" target="_blank">bgp.he.net</a>';
   ov += '<a class="ext-link" href="https://stat.ripe.net/AS' + n.asn + '" target="_blank">RIPE Stat</a>';
+  ov += '<a class="ext-link" href="https://www.routeviews.org/routeviews/index.php/prefix/?asn=' + n.asn + '" target="_blank">Route Views</a>';
   ov += '<a class="ext-link" href="https://bgproutes.io/search/AS' + n.asn + '" target="_blank">bgproutes.io</a>';
   if (n.looking_glass) ov += '<a class="ext-link" href="' + escAttr(n.looking_glass) + '" target="_blank">Looking Glass</a>';
   if (n.route_server) ov += '<a class="ext-link" href="' + escAttr(n.route_server) + '" target="_blank">Route Server</a>';
