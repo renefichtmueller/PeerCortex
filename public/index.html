@@ -130,6 +130,126 @@ a{color:var(--blue);text-decoration:none;transition:color .2s}a:hover{color:var(
 .section-loading{text-align:center;padding:1rem;color:var(--muted);font-size:.8rem}
 .section-loading::before{content:'';display:inline-block;width:16px;height:16px;border:2px solid var(--border);border-top-color:var(--purple);border-radius:50%;animation:spin .8s linear infinite;margin-right:.5rem;vertical-align:middle}
 @keyframes spin{to{transform:rotate(360deg)}}
+
+/* ASPA Deep Analysis */
+.aspa-gauge{position:relative;width:140px;height:140px;margin:0 auto .5rem}
+.aspa-gauge svg{width:100%;height:100%;transform:rotate(-90deg)}
+.aspa-gauge-bg{fill:none;stroke:var(--border);stroke-width:10}
+.aspa-gauge-fill{fill:none;stroke-width:10;stroke-linecap:round;transition:stroke-dashoffset .8s ease,stroke .3s}
+.aspa-gauge-text{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center}
+.aspa-gauge-score{font-size:2.2rem;font-weight:800;line-height:1}
+.aspa-gauge-label{font-size:.65rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.aspa-breakdown{display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin:1rem 0}
+.aspa-breakdown-item{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:.75rem}
+.aspa-breakdown-label{font-size:.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:.25rem}
+.aspa-breakdown-score{font-size:1.2rem;font-weight:700}
+.aspa-breakdown-bar{height:4px;background:var(--border);border-radius:2px;margin-top:.35rem;overflow:hidden}
+.aspa-breakdown-bar>div{height:100%;border-radius:2px;transition:width .5s ease}
+.valley-alert{background:rgba(247,118,142,.1);border:1px solid rgba(247,118,142,.3);border-radius:8px;padding:.75rem;margin:.5rem 0;font-size:.8rem;color:var(--red)}
+.asset-alert{background:rgba(255,158,100,.1);border:1px solid rgba(255,158,100,.3);border-radius:8px;padding:.75rem;margin:.5rem 0;font-size:.8rem;color:var(--orange)}
+.path-result-badge{display:inline-block;padding:.15rem .5rem;border-radius:4px;font-size:.7rem;font-weight:600}
+.path-valid{background:rgba(158,206,106,.15);color:var(--green)}
+.path-invalid{background:rgba(247,118,142,.15);color:var(--red)}
+.path-unknown{background:rgba(86,95,137,.2);color:var(--muted)}
+.hop-detail{font-size:.7rem;color:var(--text-dim);margin-top:.3rem}
+.hop-arrow{color:var(--dim);margin:0 .15rem}
+.hop-pp{color:var(--green)}.hop-npp{color:var(--red)}.hop-na{color:var(--muted)}
+.audit-row{display:flex;align-items:center;gap:.5rem;padding:.35rem 0;border-bottom:1px solid rgba(42,43,61,.3);font-size:.8rem}
+.audit-missing{color:var(--orange)}.audit-extra{color:var(--cyan)}.audit-ok{color:var(--green)}
+.ix-traffic-stats{display:flex;gap:1rem;flex-wrap:wrap;margin-top:.75rem;padding:.75rem;background:var(--bg);border:1px solid var(--border);border-radius:8px}
+.ix-traffic-stat{text-align:center}
+.ix-traffic-val{font-size:1.1rem;font-weight:700;color:var(--cyan)}
+.ix-traffic-label{font-size:.65rem;color:var(--muted);text-transform:uppercase}
+.whois-grid{display:grid;grid-template-columns:140px 1fr;gap:.3rem .75rem;font-size:.8rem}
+.whois-key{color:var(--muted);font-weight:600;text-align:right}
+.whois-val{color:var(--text-dim);word-break:break-all}
+
+
+/* Search history badges */
+.history-badge{display:inline-block;padding:.25rem .6rem;border-radius:6px;font-size:.75rem;font-weight:500;background:var(--card);border:1px solid var(--border);color:var(--text-dim);cursor:pointer;transition:all .2s}
+.history-badge:hover{border-color:var(--purple);color:var(--purple)}
+.history-clear{font-size:.7rem;color:var(--dim);cursor:pointer;padding:.25rem .5rem}
+.history-clear:hover{color:var(--red)}
+
+/* Prefix detail modal */
+.modal-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.6);z-index:1000;display:flex;align-items:center;justify-content:center}
+.modal-content{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:1.5rem;max-width:600px;width:90%;max-height:80vh;overflow-y:auto;position:relative}
+.modal-close{position:absolute;top:1rem;right:1rem;background:none;border:none;color:var(--muted);font-size:1.2rem;cursor:pointer;padding:.3rem}
+.modal-close:hover{color:var(--red)}
+.modal-title{font-size:1rem;font-weight:700;color:var(--purple);margin-bottom:1rem}
+
+/* Clickable prefix */
+.prefix-link{color:var(--cyan);cursor:pointer;font-family:monospace;font-size:.8rem}
+.prefix-link:hover{text-decoration:underline;color:var(--blue)}
+
+/* Clickable IX */
+.ix-link{color:var(--green);cursor:pointer}
+.ix-link:hover{text-decoration:underline;color:var(--cyan)}
+
+/* Provider graph */
+.provider-graph{width:100%;max-width:600px;margin:0 auto}
+.provider-graph svg{width:100%;height:auto}
+
+/* Compare full panel */
+.compare-grid{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem}
+.compare-col{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:1rem}
+.compare-col-title{font-size:.85rem;font-weight:600;margin-bottom:.75rem;display:flex;align-items:center;gap:.5rem}
+.compare-metric{display:flex;justify-content:space-between;padding:.4rem 0;border-bottom:1px solid rgba(42,43,61,.3);font-size:.8rem}
+.compare-metric-label{color:var(--muted)}
+.compare-metric-val{font-weight:600}
+.compare-venn{text-align:center;margin:1rem 0}
+
+/* Network Health Report */
+.health-gauge{position:relative;width:160px;height:160px;margin:0 auto .5rem}
+.health-gauge svg{width:100%;height:100%;transform:rotate(-90deg)}
+.health-gauge-bg{fill:none;stroke:var(--border);stroke-width:12}
+.health-gauge-fill{fill:none;stroke-width:12;stroke-linecap:round;transition:stroke-dashoffset .8s ease,stroke .3s}
+.health-gauge-text{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center}
+.health-gauge-score{font-size:2.8rem;font-weight:800;line-height:1}
+.health-gauge-label{font-size:.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.health-checks{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:.5rem;margin:1rem 0}
+.health-check-item{display:flex;align-items:center;gap:.5rem;padding:.5rem .75rem;background:var(--bg);border:1px solid var(--border);border-radius:8px;font-size:.8rem;transition:border-color .2s}
+.health-check-item:hover{border-color:var(--border-light)}
+.health-check-icon{font-size:1rem;flex-shrink:0}
+.health-check-name{flex:1;color:var(--text-dim)}
+.health-check-score{font-size:.75rem;font-weight:600;min-width:2rem;text-align:right}
+
+.health-check-item{position:relative;cursor:pointer}
+.health-tooltip{display:none;position:absolute;bottom:calc(100% + 8px);left:50%;transform:translateX(-50%);background:#1a1b26;border:1px solid #3b3d56;border-radius:8px;padding:12px 16px;min-width:300px;max-width:400px;z-index:1000;box-shadow:0 4px 20px rgba(0,0,0,0.5);font-size:13px;line-height:1.6;color:#a9b1d6;pointer-events:none}
+.health-tooltip::after{content:'';position:absolute;top:100%;left:50%;transform:translateX(-50%);border:6px solid transparent;border-top-color:#3b3d56}
+.health-tooltip .tt-section{margin-bottom:6px}
+.health-tooltip .tt-label{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:#565f89;font-weight:600}
+.health-tooltip .tt-value{color:#c0caf5}
+.health-tooltip .tt-fix{color:#ff9e64;font-style:italic}
+.health-check-item:hover .health-tooltip{display:block}
+
+.show-more-btn{font-size:.8rem;color:var(--blue);cursor:pointer;padding:.5rem 0;margin-top:.25rem;transition:color .2s;user-select:none}
+.show-more-btn:hover{color:var(--cyan);text-decoration:underline}
+.sort-toggle{font-size:.7rem;color:var(--muted);cursor:pointer;padding:.2rem .5rem;border:1px solid var(--border);border-radius:4px;transition:all .2s;user-select:none}
+.sort-toggle:hover{color:var(--blue);border-color:var(--blue)}
+
+/* Routing Overview - Propagation Bars */
+.routing-stats-row{display:flex;gap:1rem;flex-wrap:wrap;margin-bottom:1.25rem}
+.routing-stat-card{flex:1;min-width:100px;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:.875rem 1rem;text-align:center}
+.routing-stat-val{font-size:1.6rem;font-weight:700;line-height:1.2}
+.routing-stat-label{font-size:.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-top:.25rem}
+.prop-section{margin-bottom:1rem}
+.prop-label{font-size:.8rem;font-weight:600;color:var(--text-dim);margin-bottom:.4rem}
+.prop-bar-wrap{display:flex;align-items:center;gap:.75rem}
+.prop-bar{flex:1;height:12px;border-radius:6px;background:#1e2030;overflow:hidden}
+.prop-fill{height:100%;border-radius:6px;transition:width 1.2s cubic-bezier(.4,0,.2,1);width:0}
+.prop-fill.green{background:linear-gradient(90deg,#9ece6a,#73daca)}
+.prop-fill.orange{background:linear-gradient(90deg,#e0af68,#ff9e64)}
+.prop-fill.red{background:linear-gradient(90deg,#f7768e,#db4b4b)}
+.prop-pct{font-size:.9rem;font-weight:700;min-width:50px;text-align:right}
+.prop-detail{font-size:.7rem;color:var(--muted);margin-top:.2rem}
+.prefix-dist{margin-top:1rem}
+.prefix-dist-label{font-size:.8rem;font-weight:600;color:var(--text-dim);margin-bottom:.5rem}
+.prefix-badges{display:flex;flex-wrap:wrap;gap:.4rem}
+.prefix-badge{font-size:.7rem;padding:.2rem .5rem;border-radius:4px;background:var(--bg);border:1px solid var(--border);color:var(--text-dim);font-family:'Inter',monospace}
+.routing-footer{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.75rem;margin-top:1rem;padding-top:.75rem;border-top:1px solid var(--border)}
+.routing-footer-left{display:flex;align-items:center;gap:.5rem;font-size:.8rem;color:var(--text-dim)}
+
 </style>
 </head>
 <body>
@@ -147,7 +267,7 @@ a{color:var(--blue);text-decoration:none;transition:color .2s}a:hover{color:var(
       <line x1="18" y1="13" x2="25" y2="22" stroke="#565f89" stroke-width="1.5"/>
       <line x1="13" y1="24" x2="23" y2="24" stroke="#565f89" stroke-width="1.5"/>
     </svg>
-    <div><h1>PeerCortex</h1><span>Network Intelligence Dashboard v0.2</span></div>
+    <div><h1>PeerCortex</h1><span>Network Intelligence Dashboard v0.3</span></div>
   </div>
   <nav class="quick-links">
     <a href="https://github.com/peercortex/peercortex" target="_blank">GitHub</a>
@@ -155,6 +275,7 @@ a{color:var(--blue);text-decoration:none;transition:color .2s}a:hover{color:var(
     <a href="https://stat.ripe.net" target="_blank">RIPE Stat</a>
     <a href="https://bgp.he.net" target="_blank">bgp.he.net</a>
     <a href="https://atlas.ripe.net" target="_blank">RIPE Atlas</a>
+    <a href="https://www.routeviews.org" target="_blank">Route Views</a>
     <a href="https://bgproutes.io" target="_blank">bgproutes.io</a>
   </nav>
 </div>
@@ -166,6 +287,7 @@ a{color:var(--blue);text-decoration:none;transition:color .2s}a:hover{color:var(
   <input type="text" class="search-input" id="asnInput" placeholder="Enter ASN (e.g. 13335, 6939, 174)" value="" autofocus>
   <button class="search-btn" id="searchBtn" onclick="doLookup()">Lookup</button>
 </div>
+<div id="searchHistory" style="margin-top:.75rem;display:flex;flex-wrap:wrap;gap:.4rem"></div>
 </section>
 
 <!-- Meta bar -->
@@ -203,7 +325,17 @@ a{color:var(--blue);text-decoration:none;transition:color .2s}a:hover{color:var(
 
   <!-- Atlas Probes -->
   <div class="card full" id="atlasCard">
+    
+  <!-- Network Health Report -->
+  <div class="card full" id="healthCard">
     <div class="card-title">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+      Network Health Report
+    </div>
+    <div id="healthContent"><div class="section-loading">Running comprehensive validation...</div></div>
+  </div>
+
+<div class="card-title">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg>
       RIPE Atlas Probes
     </div>
@@ -219,6 +351,16 @@ a{color:var(--blue);text-decoration:none;transition:color .2s}a:hover{color:var(
     <div id="aspaContent"><div class="section-loading">Loading ASPA data...</div></div>
   </div>
 
+
+  <!-- ASPA Deep Analysis (RFC-Compliant Verification) -->
+  <div class="card full" id="aspaDeepCard">
+    <div class="card-title">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>
+      ASPA Deep Analysis (RFC-Compliant)
+    </div>
+    <div id="aspaDeepContent"><div class="section-loading">Loading ASPA deep analysis...</div></div>
+  </div>
+
   <!-- bgproutes.io (NEW) -->
   <div class="card full" id="bgroutesCard">
     <div class="card-title">
@@ -226,6 +368,25 @@ a{color:var(--blue);text-decoration:none;transition:color .2s}a:hover{color:var(
       bgproutes.io
     </div>
     <div id="bgroutesContent"><div class="section-loading">Loading bgproutes.io data...</div></div>
+  </div>
+
+
+  <!-- Routing Overview (enhanced Feature 24) -->
+  <div class="card full hidden" id="bgpHeCard">
+    <div class="card-title">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+      Routing Overview
+    </div>
+    <div id="bgpHeContent"></div>
+  </div>
+
+  <!-- WHOIS Details (Feature 27) -->
+  <div class="card full" id="whoisCard">
+    <div class="card-title">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+      WHOIS Details
+    </div>
+    <div id="whoisContent"><div class="section-loading">Loading WHOIS data...</div></div>
   </div>
 
   <!-- Neighbours -->
@@ -255,6 +416,24 @@ a{color:var(--blue);text-decoration:none;transition:color .2s}a:hover{color:var(
     <div id="facContent"></div>
   </div>
 
+  <!-- Provider Relationship Graph -->
+  <div class="card full hidden" id="providerGraphCard">
+    <div class="card-title">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="5" r="3"/><circle cx="5" cy="19" r="3"/><circle cx="19" cy="19" r="3"/><line x1="12" y1="8" x2="5" y2="16"/><line x1="12" y1="8" x2="19" y2="16"/></svg>
+      Provider Relationship Graph
+    </div>
+    <div id="providerGraphContent"></div>
+  </div>
+
+  <!-- ASPA Change Alert -->
+  <div class="card hidden" id="aspaAlertCard">
+    <div class="card-title">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      ASPA Change Tracking
+    </div>
+    <div id="aspaAlertContent"></div>
+  </div>
+
   <!-- Quick Compare -->
   <div class="card" id="compareCard">
     <div class="card-title">
@@ -273,6 +452,9 @@ a{color:var(--blue);text-decoration:none;transition:color .2s}a:hover{color:var(
 
 </div>
 
+<!-- Full Compare Results -->
+<div class="dashboard hidden" id="fullComparePanel" style="margin-top:1rem"></div>
+
 <!-- Loading Skeleton -->
 <div class="dashboard hidden" id="skeleton">
   <div class="card full"><div class="card-title">Network Overview</div><div class="skeleton h2"></div><div class="skeleton h3"></div><div class="skeleton wide"></div><div class="skeleton med"></div></div>
@@ -280,7 +462,10 @@ a{color:var(--blue);text-decoration:none;transition:color .2s}a:hover{color:var(
   <div class="card"><div class="card-title">RPKI Compliance</div><div class="skeleton h2"></div><div class="skeleton wide"></div></div>
   <div class="card full"><div class="card-title">RIPE Atlas Probes</div><div class="skeleton wide"></div><div class="skeleton med"></div></div>
   <div class="card full"><div class="card-title">ASPA Status</div><div class="skeleton wide"></div><div class="skeleton med"></div></div>
+  <div class="card full"><div class="card-title">ASPA Deep Analysis</div><div class="skeleton h2"></div><div class="skeleton wide"></div><div class="skeleton med"></div><div class="skeleton wide"></div></div>
   <div class="card full"><div class="card-title">bgproutes.io</div><div class="skeleton wide"></div><div class="skeleton med"></div></div>
+  <div class="card full"><div class="card-title">Routing Overview</div><div class="skeleton wide"></div><div class="skeleton med"></div><div class="skeleton wide"></div></div>
+  <div class="card full"><div class="card-title">WHOIS Details</div><div class="skeleton wide"></div><div class="skeleton med"></div></div>
   <div class="card full"><div class="card-title">AS Neighbours</div><div class="skeleton wide"></div><div class="skeleton wide"></div><div class="skeleton med"></div></div>
   <div class="card full"><div class="card-title">IX Presence</div><div class="skeleton wide"></div><div class="skeleton wide"></div></div>
   <div class="card"><div class="card-title">Facilities</div><div class="skeleton wide"></div><div class="skeleton med"></div></div>
@@ -288,15 +473,112 @@ a{color:var(--blue);text-decoration:none;transition:color .2s}a:hover{color:var(
 </div>
 
 <!-- Footer -->
+
+  
+  <!-- Peering Recommendations -->
+  <div class="card full hidden" id="peeringRecCard">
+    <div class="card-title">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      Peering Recommendations
+    </div>
+    <div id="peeringRecContent"><div style="color:var(--dim);font-size:.85rem">Analyzing IX overlap with top networks...</div></div>
+  </div>
+
+  <!-- Integrated Sources of Trust -->
+  <div class="card full hidden" id="sourcesCard">
+    <div class="card-title">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      Integrated Sources of Trust
+    </div>
+    <div id="sourcesContent">
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:1rem">
+
+        <div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:1rem;display:flex;gap:.75rem;align-items:flex-start">
+          <div style="width:36px;height:36px;border-radius:8px;background:rgba(156,206,106,.12);border:1px solid rgba(156,206,106,.2);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:1rem">🌐</div>
+          <div><div style="font-weight:700;font-size:.85rem;color:var(--green)">PeeringDB</div><div style="font-size:.7rem;color:var(--muted);margin-top:.15rem">Network profiles, IX presence, facilities, peering policy. The authoritative source for interconnection data.</div><a href="https://www.peeringdb.com" target="_blank" style="font-size:.65rem;color:var(--blue)">peeringdb.com</a></div>
+        </div>
+
+        <div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:1rem;display:flex;gap:.75rem;align-items:flex-start">
+          <div style="width:36px;height:36px;border-radius:8px;background:rgba(122,162,247,.12);border:1px solid rgba(122,162,247,.2);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:1rem">📊</div>
+          <div><div style="font-weight:700;font-size:.85rem;color:var(--blue)">RIPE Stat</div><div style="font-size:.7rem;color:var(--muted);margin-top:.15rem">Announced prefixes, AS neighbours, routing visibility, BGP updates, geolocation, abuse contacts.</div><a href="https://stat.ripe.net" target="_blank" style="font-size:.65rem;color:var(--blue)">stat.ripe.net</a></div>
+        </div>
+
+        <div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:1rem;display:flex;gap:.75rem;align-items:flex-start">
+          <div style="width:36px;height:36px;border-radius:8px;background:rgba(187,154,247,.12);border:1px solid rgba(187,154,247,.2);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:1rem">🛡️</div>
+          <div><div style="font-weight:700;font-size:.85rem;color:var(--purple)">RPKI / ROA Validation</div><div style="font-size:.7rem;color:var(--muted);margin-top:.15rem">Per-prefix Route Origin Authorization validation via RIPE RPKI validators. Detects invalid or missing ROAs.</div><a href="https://rpki.cloudflare.com" target="_blank" style="font-size:.65rem;color:var(--blue)">rpki.cloudflare.com</a></div>
+        </div>
+
+        <div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:1rem;display:flex;gap:.75rem;align-items:flex-start">
+          <div style="width:36px;height:36px;border-radius:8px;background:rgba(255,158,100,.12);border:1px solid rgba(255,158,100,.2);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:1rem">🔐</div>
+          <div><div style="font-weight:700;font-size:.85rem;color:var(--orange)">ASPA (RFC 9582)</div><div style="font-size:.7rem;color:var(--muted);margin-top:.15rem">AS Provider Authorization from Cloudflare RPKI JSON feed. RFC-compliant upstream/downstream path verification with valley detection.</div><a href="https://www.ietf.org/archive/id/draft-ietf-sidrops-aspa-verification-14.html" target="_blank" style="font-size:.65rem;color:var(--blue)">IETF Draft-14</a></div>
+        </div>
+
+        <div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:1rem;display:flex;gap:.75rem;align-items:flex-start">
+          <div style="width:36px;height:36px;border-radius:8px;background:rgba(125,207,255,.12);border:1px solid rgba(125,207,255,.2);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:1rem">📡</div>
+          <div><div style="font-weight:700;font-size:.85rem;color:var(--cyan)">RIPE Atlas</div><div style="font-size:.7rem;color:var(--muted);margin-top:.15rem">Active measurement infrastructure. Probe presence, connectivity status, and anchor detection per ASN.</div><a href="https://atlas.ripe.net" target="_blank" style="font-size:.65rem;color:var(--blue)">atlas.ripe.net</a></div>
+        </div>
+
+        <div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:1rem;display:flex;gap:.75rem;align-items:flex-start">
+          <div style="width:36px;height:36px;border-radius:8px;background:rgba(224,175,104,.12);border:1px solid rgba(224,175,104,.2);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:1rem">🔭</div>
+          <div><div style="font-weight:700;font-size:.85rem;color:var(--yellow)">bgproutes.io</div><div style="font-size:.7rem;color:var(--muted);margin-top:.15rem">Next-gen BGP data collection. 3,294+ vantage points, RIB queries, ROV and ASPA validation status per route.</div><a href="https://bgproutes.io" target="_blank" style="font-size:.65rem;color:var(--blue)">bgproutes.io</a></div>
+        </div>
+
+        <div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:1rem;display:flex;gap:.75rem;align-items:flex-start">
+          <div style="width:36px;height:36px;border-radius:8px;background:rgba(156,206,106,.12);border:1px solid rgba(156,206,106,.2);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:1rem">🔍</div>
+          <div><div style="font-weight:700;font-size:.85rem;color:var(--green)">NLNOG IRR Explorer</div><div style="font-size:.7rem;color:var(--muted);margin-top:.15rem">Cross-references BGP origin announcements with Internet Routing Registry records. Detects mismatches and unauthorized announcements.</div><a href="https://irrexplorer.nlnog.net" target="_blank" style="font-size:.65rem;color:var(--blue)">irrexplorer.nlnog.net</a></div>
+        </div>
+
+        <div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:1rem;display:flex;gap:.75rem;align-items:flex-start">
+          <div style="width:36px;height:36px;border-radius:8px;background:rgba(247,119,142,.12);border:1px solid rgba(247,119,142,.2);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:1rem">🤝</div>
+          <div><div style="font-weight:700;font-size:.85rem;color:var(--red)">MANRS Observatory</div><div style="font-size:.7rem;color:var(--muted);margin-top:.15rem">Mutually Agreed Norms for Routing Security. Checks membership, conformance level, and routing security commitment.</div><a href="https://observatory.manrs.org" target="_blank" style="font-size:.65rem;color:var(--blue)">observatory.manrs.org</a></div>
+        </div>
+
+        <div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:1rem;display:flex;gap:.75rem;align-items:flex-start">
+          <div style="width:36px;height:36px;border-radius:8px;background:rgba(192,202,245,.12);border:1px solid rgba(192,202,245,.2);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:1rem">🌍</div>
+          <div><div style="font-weight:700;font-size:.85rem;color:var(--white)">bgp.he.net</div><div style="font-size:.7rem;color:var(--muted);margin-top:.15rem">Hurricane Electric BGP Toolkit. AS information, prefix lists, peer counts, and country attribution.</div><a href="https://bgp.he.net" target="_blank" style="font-size:.65rem;color:var(--blue)">bgp.he.net</a></div>
+        </div>
+
+        <div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:1rem;display:flex;gap:.75rem;align-items:flex-start">
+          <div style="width:36px;height:36px;border-radius:8px;background:rgba(192,202,245,.12);border:1px solid rgba(192,202,245,.2);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:1rem">🚫</div>
+          <div><div style="font-weight:700;font-size:.85rem;color:var(--white)">Team Cymru Bogon Reference</div><div style="font-size:.7rem;color:var(--muted);margin-top:.15rem">Bogon prefix and ASN detection. Identifies reserved, unallocated, and private address space in BGP announcements.</div><a href="https://team-cymru.com/community-services/bogon-reference/" target="_blank" style="font-size:.65rem;color:var(--blue)">team-cymru.com</a></div>
+        </div>
+
+        <div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:1rem;display:flex;gap:.75rem;align-items:flex-start">
+          <div style="width:36px;height:36px;border-radius:8px;background:rgba(122,162,247,.12);border:1px solid rgba(122,162,247,.2);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:1rem">📂</div>
+          <div><div style="font-weight:700;font-size:.85rem;color:var(--blue)">RIPE DB / IRR</div><div style="font-size:.7rem;color:var(--muted);margin-top:.15rem">Internet Routing Registry objects (aut-num, route, as-set). RPSL policy validation and object completeness checks.</div><a href="https://apps.db.ripe.net" target="_blank" style="font-size:.65rem;color:var(--blue)">apps.db.ripe.net</a></div>
+        </div>
+
+        <div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:1rem;display:flex;gap:.75rem;align-items:flex-start">
+          <div style="width:36px;height:36px;border-radius:8px;background:rgba(125,207,255,.12);border:1px solid rgba(125,207,255,.2);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:1rem">📈</div>
+          <div><div style="font-weight:700;font-size:.85rem;color:var(--cyan)">Route Views / RIPE RIS</div><div style="font-size:.7rem;color:var(--muted);margin-top:.15rem">BGP route collectors providing global routing table visibility. Used for path analysis, visibility scoring, and anomaly detection.</div><a href="http://www.routeviews.org" target="_blank" style="font-size:.65rem;color:var(--blue)">routeviews.org</a></div>
+        </div>
+
+      </div>
+      <div style="margin-top:1rem;font-size:.7rem;color:var(--dim);text-align:center">All data is queried in real-time from authoritative sources. No data is stored or cached beyond 5 minutes.</div>
+    </div>
+  </div>
+
 <footer class="footer">
-  PeerCortex v0.2.0 &mdash; Open Source &mdash; MIT License<br>
+  <div style="margin-bottom:.75rem;font-size:.7rem;color:var(--dim)">
+    Data powered by
+    <a href="https://www.peeringdb.com" target="_blank">PeeringDB</a> &middot;
+    <a href="https://stat.ripe.net" target="_blank">RIPE Stat</a> &middot;
+    <a href="https://atlas.ripe.net" target="_blank">RIPE Atlas</a> &middot;
+    <a href="https://www.routeviews.org" target="_blank">Route Views</a> &middot;
+    <a href="https://bgp.he.net" target="_blank">bgp.he.net</a> &middot;
+    <a href="https://bgproutes.io" target="_blank">bgproutes.io</a> &middot;
+    <a href="https://www.ripe.net/manage-ips-and-asns/db" target="_blank">RIPE DB</a> &middot;
+    <a href="https://rpki.cloudflare.com" target="_blank">Cloudflare RPKI</a>
+  </div>
+  PeerCortex v0.5.0 &mdash; Open Source &mdash; MIT License<br>
   <a href="https://github.com/renefichtmueller/PaperCortex" target="_blank">PaperCortex</a> &middot;
-  <a href="https://github.com/peercortex/peercortex" target="_blank">PeerCortex GitHub</a>
+  <a href="https://github.com/renefichtmueller/PeerCortex" target="_blank">PeerCortex GitHub</a>
 </footer>
 
 <script>
 const $ = id => document.getElementById(id);
 let currentAsn = null;
+let currentLookupData = null;
 
 function countryFlag(code) {
   if (!code || code.length !== 2) return '';
@@ -305,8 +587,8 @@ function countryFlag(code) {
 }
 
 function fmtSpeed(mbps) {
-  if (!mbps || mbps === 0) return '-';
-  if (mbps >= 1000) return (mbps / 1000) + ' Gbps';
+  if (!mbps || mbps === 0) return '0 Gbps';
+  if (mbps >= 1000) return (mbps / 1000).toFixed(0) + ' Gbps';
   return mbps + ' Mbps';
 }
 
@@ -319,6 +601,15 @@ function rpkiIcon(status) {
 function pct(n, total) {
   if (!total) return 0;
   return Math.round((n / total) * 100);
+}
+
+function worstStatus(raw) {
+  if (!raw) return 'unknown';
+  var parts = raw.split(',').map(function(s) { return s.trim().toLowerCase(); });
+  if (parts.indexOf('invalid') >= 0) return 'invalid';
+  if (parts.indexOf('unknown') >= 0) return 'unknown';
+  if (parts.indexOf('valid') >= 0) return 'valid';
+  return parts[0] || 'unknown';
 }
 
 function asnLink(asn) {
@@ -336,6 +627,44 @@ function copyToClipboard(text, btn) {
     btn.textContent = 'Copied!';
     setTimeout(function() { btn.textContent = orig; }, 1500);
   });
+}
+
+function renderAuditList(containerId, list, sortBy, type) {
+  var sorted = list.slice();
+  if (sortBy === 'asn') sorted.sort(function(a, b) { return a.asn - b.asn; });
+  else if (sortBy === 'frequency') sorted.sort(function(a, b) { return (b.frequency || 0) - (a.frequency || 0); });
+  else if (sortBy === 'name') sorted.sort(function(a, b) { return (a.name || '').localeCompare(b.name || ''); });
+
+  var labelId = type === 'missing' ? 'missingSortLabel' : 'extraSortLabel';
+  var labelEl = document.getElementById(labelId);
+  if (labelEl) labelEl.textContent = sortBy === 'asn' ? 'by ASN' : sortBy === 'frequency' ? 'by frequency' : 'by name';
+
+  var LIMIT = 5;
+  var h = '';
+  sorted.slice(0, LIMIT).forEach(function(item) {
+    h += '<div class="audit-row audit-' + type + '">';
+    h += '<span style="font-weight:600">' + asnLink(item.asn) + '</span>';
+    if (item.name && item.name !== 'AS' + item.asn) h += ' <span style="color:var(--muted)">' + escHtml(item.name) + '</span>';
+    if (type === 'missing') h += ' <span class="badge badge-orange">seen in ' + (item.frequency_pct || 0) + '% of paths (' + (item.frequency || 0) + ')</span>';
+    else h += ' <span class="badge badge-cyan">not seen in any path</span>';
+    h += '</div>';
+  });
+  if (sorted.length > LIMIT) {
+    var moreId = containerId + 'More';
+    h += '<div id="' + moreId + '" style="display:none">';
+    sorted.slice(LIMIT).forEach(function(item) {
+      h += '<div class="audit-row audit-' + type + '">';
+      h += '<span style="font-weight:600">' + asnLink(item.asn) + '</span>';
+      if (item.name && item.name !== 'AS' + item.asn) h += ' <span style="color:var(--muted)">' + escHtml(item.name) + '</span>';
+      if (type === 'missing') h += ' <span class="badge badge-orange">seen in ' + (item.frequency_pct || 0) + '% of paths (' + (item.frequency || 0) + ')</span>';
+      else h += ' <span class="badge badge-cyan">not seen in any path</span>';
+      h += '</div>';
+    });
+    h += '</div>';
+    var remaining = sorted.length - LIMIT;
+    h += '<div class="show-more-btn" onclick="var el=document.getElementById(\'' + moreId + '\');if(el.style.display===\'none\'){el.style.display=\'block\';this.textContent=\'Hide ' + remaining + ' entries\';}else{el.style.display=\'none\';this.textContent=\'Show ' + remaining + ' more...\';}">Show ' + remaining + ' more...</div>';
+  }
+  document.getElementById(containerId).innerHTML = h;
 }
 
 async function doLookup() {
@@ -359,16 +688,25 @@ async function doLookup() {
       return;
     }
 
+    currentLookupData = d;
     renderDashboard(d);
     $('skeleton').classList.add('hidden');
     $('dashboard').classList.remove('hidden');
     $('metaBar').textContent = 'Query: ' + d.meta.query + ' | Duration: ' + d.meta.duration_ms + 'ms | RPKI checked: ' + d.meta.rpki_prefixes_checked + '/' + d.meta.total_prefixes + ' prefixes | ' + d.meta.timestamp;
 
     history.replaceState(null, '', '?asn=' + raw);
+    saveToHistory(raw, d.network ? d.network.name : 'AS' + raw);
+
+    $('sourcesCard').classList.remove('hidden');
+    // Load peering recommendations
+    if (d.ix_presence && d.ix_presence.connections) loadPeeringRecommendations(currentAsn, d.ix_presence.connections);
 
     // Load ASPA and bgproutes.io data asynchronously
+    loadHealthReport(raw);
     loadAspaData(raw);
+    loadAspaVerifyData(raw);
     loadBgroutesData(raw);
+    loadWhoisData(raw);
   } catch (e) {
     $('skeleton').classList.add('hidden');
     $('metaBar').textContent = 'Error: ' + e.message;
@@ -382,15 +720,26 @@ async function loadAspaData(asn) {
   $('aspaContent').innerHTML = '<div class="section-loading">Loading ASPA data...</div>';
   try {
     const resp = await fetch('/api/aspa?asn=' + asn);
-    const d = await resp.json();
-    if (d.error) {
-      $('aspaContent').innerHTML = '<div style="color:var(--red);font-size:.85rem">ASPA check failed: ' + escHtml(d.error) + '</div>';
-      return;
-    }
+    if (!resp.ok) { $('aspaContent').textContent = 'ASPA data unavailable (server ' + resp.status + ')'; renderProviderGraphFromLookupFallback(asn); return; }
+    var text = await resp.text();
+    if (!text || text[0] === '<') { $('aspaContent').textContent = 'ASPA data unavailable (timeout). Provider data shown from lookup.'; renderProviderGraphFromLookupFallback(asn); return; }
+    const d = JSON.parse(text);
+    if (d.error) { $('aspaContent').textContent = 'ASPA check failed: ' + d.error; renderProviderGraphFromLookupFallback(asn); return; }
     renderAspa(d);
   } catch (e) {
     $('aspaContent').innerHTML = '<div style="color:var(--red);font-size:.85rem">ASPA check failed: ' + escHtml(e.message) + '</div>';
+    renderProviderGraphFromLookupFallback(asn);
   }
+}
+
+function renderProviderGraphFromLookupFallback(asn) {
+  if (!currentLookupData || !currentLookupData.neighbours) return;
+  var upstreams = currentLookupData.neighbours.upstreams || [];
+  if (upstreams.length === 0) return;
+  var providers = upstreams.map(function(u) {
+    return { asn: u.asn, name: u.name || '', frequency_pct: u.power ? Math.min(u.power * 10, 100) : 0 };
+  });
+  renderProviderGraph(asn, providers);
 }
 
 async function loadBgroutesData(asn) {
@@ -415,11 +764,16 @@ function renderAspa(d) {
   h += '<div style="display:flex;gap:2rem;flex-wrap:wrap;margin-bottom:1rem">';
   h += '<div><div style="font-size:.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.25rem">ASPA Object</div>';
   if (d.aspa_object_exists) {
-    h += '<div class="status-yes">Found in RIPE DB</div>';
+    h += '<div class="status-yes">Found in RPKI</div>';
   } else {
     h += '<div class="status-no">Not Found</div>';
   }
   h += '</div>';
+  if (d.aspa_object_exists && d.aspa_declared_providers && d.aspa_declared_providers.length > 0) {
+    h += '<div><div style="font-size:.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.25rem">RPKI-Declared Providers</div>';
+    h += '<div style="font-size:1.5rem;font-weight:700;color:var(--green)">' + d.aspa_declared_count + '</div>';
+    h += '</div>';
+  }
   h += '<div><div style="font-size:.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.25rem">Detected Providers</div>';
   h += '<div style="font-size:1.5rem;font-weight:700;color:var(--blue)">' + d.provider_count + '</div>';
   h += '</div>';
@@ -428,21 +782,45 @@ function renderAspa(d) {
   h += '</div>';
   h += '</div>';
 
-  // Detected providers
+  // Detected providers (collapsible after 10)
   if (d.detected_providers && d.detected_providers.length > 0) {
-    h += '<div style="font-size:.8rem;font-weight:600;color:var(--orange);margin:.75rem 0 .4rem">Detected Upstream Providers</div>';
-    h += '<div style="display:flex;flex-wrap:wrap;gap:.3rem;margin-bottom:1rem">';
-    d.detected_providers.forEach(function(p) {
+    var provLimit = 10;
+    var provList = d.detected_providers.slice().sort(function(a, b) { return a.asn - b.asn; });
+    h += '<div style="font-size:.8rem;font-weight:600;color:var(--orange);margin:.75rem 0 .4rem">Detected Upstream Providers (' + provList.length + ')</div>';
+    h += '<div style="display:flex;flex-wrap:wrap;gap:.3rem;margin-bottom:.25rem">';
+    provList.slice(0, provLimit).forEach(function(p) {
       var nameStr = (p.name && p.name !== 'AS' + p.asn) ? ' ' + escHtml(p.name) : '';
       h += '<span class="badge badge-orange">' + asnLink(p.asn) + nameStr + '</span>';
     });
     h += '</div>';
+    if (provList.length > provLimit) {
+      var provMoreId = 'provMore' + Date.now();
+      h += '<div id="' + provMoreId + '" style="display:none;flex-wrap:wrap;gap:.3rem;margin-bottom:.25rem">';
+      provList.slice(provLimit).forEach(function(p) {
+        var nameStr = (p.name && p.name !== 'AS' + p.asn) ? ' ' + escHtml(p.name) : '';
+        h += '<span class="badge badge-orange">' + asnLink(p.asn) + nameStr + '</span>';
+      });
+      h += '</div>';
+      h += '<div class="show-more-btn" onclick="var el=document.getElementById(\'' + provMoreId + '\');if(el.style.display===\'none\'){el.style.display=\'flex\';this.textContent=\'Hide ' + (provList.length - provLimit) + ' providers\';}else{el.style.display=\'none\';this.textContent=\'Show ' + (provList.length - provLimit) + ' more providers...\';}">Show ' + (provList.length - provLimit) + ' more providers...</div>';
+    }
   }
 
-  // Recommended ASPA template
+  // RPKI-declared providers (when ASPA object exists)
+  if (d.aspa_object_exists && d.aspa_declared_providers && d.aspa_declared_providers.length > 0) {
+    var declaredList = d.aspa_declared_providers.slice().sort(function(a, b) { return a.asn - b.asn; });
+    h += '<div style="font-size:.8rem;font-weight:600;color:var(--green);margin:.75rem 0 .4rem">RPKI-Declared Providers (' + declaredList.length + ')</div>';
+    h += '<div style="display:flex;flex-wrap:wrap;gap:.3rem;margin-bottom:.25rem">';
+    declaredList.forEach(function(p) {
+      var label = p.asn === 0 ? 'AS0 (Tier-1 / No Provider)' : asnLink(p.asn);
+      h += '<span class="badge badge-green">' + label + '</span>';
+    });
+    h += '</div>';
+  }
+
+  // Recommended ASPA template (scrollable, max 200px)
   if (d.recommended_aspa) {
     h += '<div style="font-size:.8rem;font-weight:600;color:var(--cyan);margin:.75rem 0 .4rem">Recommended ASPA Object</div>';
-    h += '<div class="aspa-template" id="aspaTemplate">' + escHtml(d.recommended_aspa);
+    h += '<div class="aspa-template" id="aspaTemplate" style="max-height:200px;overflow-y:auto">' + escHtml(d.recommended_aspa);
     h += '<button class="copy-btn" onclick="copyToClipboard(document.getElementById(\'aspaTemplate\').innerText, this)">Copy</button>';
     h += '</div>';
   }
@@ -462,6 +840,16 @@ function renderAspa(d) {
 
   h += '<div style="font-size:.7rem;color:var(--dim);margin-top:.5rem">Analyzed in ' + (d.meta ? d.meta.duration_ms : '?') + 'ms</div>';
   $('aspaContent').innerHTML = h;
+
+  // Feature 8: ASPA Change Alerting
+  if (d.detected_providers && currentAsn) {
+    checkAspaChanges(currentAsn, d.detected_providers);
+  }
+
+  // Feature 9: Provider Relationship Graph
+  if (d.detected_providers && d.detected_providers.length > 0 && currentAsn) {
+    renderProviderGraph(currentAsn, d.detected_providers);
+  }
 }
 
 function renderBgroutes(d) {
@@ -510,12 +898,14 @@ function renderBgroutes(d) {
     h += '<div class="expand-toggle" onclick="toggleExpand(this)">Show route data (' + d.routes.count + ' routes, showing ' + d.routes.sample.length + ')</div>';
     h += '<div class="expand-body"><div class="scroll-wrap"><table class="tbl"><thead><tr><th>Prefix</th><th>AS Path</th><th>ROV</th><th>ASPA</th></tr></thead><tbody>';
     d.routes.sample.forEach(function(r) {
-      var rovBadge = (r.rov_status || '').indexOf('valid') >= 0 ? 'badge-green' : (r.rov_status || '').indexOf('invalid') >= 0 ? 'badge-red' : 'badge-orange';
-      var aspaBadge = (r.aspa_status || '') === 'valid' ? 'badge-green' : (r.aspa_status || '') === 'invalid' ? 'badge-red' : 'badge-orange';
+      var rov = worstStatus(r.rov_status);
+      var aspa = worstStatus(r.aspa_status);
+      var rovBadge = rov === 'valid' ? 'badge-green' : rov === 'invalid' ? 'badge-red' : 'badge-orange';
+      var aspaBadge = aspa === 'valid' ? 'badge-green' : aspa === 'invalid' ? 'badge-red' : 'badge-orange';
       h += '<tr><td style="font-family:monospace;font-size:.7rem">' + escHtml(r.prefix || '') + '</td>';
       h += '<td style="font-family:monospace;font-size:.65rem;max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + escAttr(r.as_path || '') + '">' + escHtml(r.as_path || '') + '</td>';
-      h += '<td><span class="badge ' + rovBadge + '">' + escHtml(r.rov_status || '?') + '</span></td>';
-      h += '<td><span class="badge ' + aspaBadge + '">' + escHtml(r.aspa_status || '?') + '</span></td></tr>';
+      h += '<td><span class="badge ' + rovBadge + '">' + escHtml(rov) + '</span></td>';
+      h += '<td><span class="badge ' + aspaBadge + '">' + escHtml(aspa) + '</span></td></tr>';
     });
     h += '</tbody></table></div></div>';
   }
@@ -543,12 +933,14 @@ function renderDashboard(d) {
   if (n.scope) ov += '<span class="badge badge-orange">' + escHtml(n.scope) + '</span>';
   if (n.traffic) ov += '<span class="badge badge-cyan">' + escHtml(n.traffic) + '</span>';
   if (n.website) ov += '<div style="margin-top:.5rem"><a href="' + escAttr(n.website) + '" target="_blank">' + escHtml(n.website) + '</a></div>';
-  if (n.notes) ov += '<div style="margin-top:.5rem;font-size:.8rem;color:var(--muted)">' + escHtml(n.notes) + '</div>';
+  if (n.org_name) ov += '<div style="margin-top:.4rem;font-size:.85rem;color:var(--dim)">' + escHtml(n.org_name) + '</div>';
+  if (n.notes) ov += '<div style="margin-top:.3rem;font-size:.8rem;color:var(--dim);line-height:1.5;max-height:4.5em;overflow:hidden">' + escHtml(n.notes) + '</div>';
 
   ov += '<div class="ext-links">';
   if (n.peeringdb_id) ov += '<a class="ext-link" href="https://www.peeringdb.com/net/' + n.peeringdb_id + '" target="_blank">PeeringDB</a>';
   ov += '<a class="ext-link" href="https://bgp.he.net/AS' + n.asn + '" target="_blank">bgp.he.net</a>';
   ov += '<a class="ext-link" href="https://stat.ripe.net/AS' + n.asn + '" target="_blank">RIPE Stat</a>';
+  ov += '<a class="ext-link" href="https://www.routeviews.org/routeviews/index.php/prefix/?asn=' + n.asn + '" target="_blank">Route Views</a>';
   ov += '<a class="ext-link" href="https://bgproutes.io/search/AS' + n.asn + '" target="_blank">bgproutes.io</a>';
   if (n.looking_glass) ov += '<a class="ext-link" href="' + escAttr(n.looking_glass) + '" target="_blank">Looking Glass</a>';
   if (n.route_server) ov += '<a class="ext-link" href="' + escAttr(n.route_server) + '" target="_blank">Route Server</a>';
@@ -573,7 +965,7 @@ function renderDashboard(d) {
     (r.details || []).forEach(function(rd) { rpkiMap[rd.prefix] = rd.status; });
     p.list.forEach(function(pfx) {
       const st = rpkiMap[pfx] || 'not_checked';
-      px += '<tr><td style="font-family:monospace;font-size:.8rem">' + escHtml(pfx) + '</td><td>' + rpkiIcon(st) + '</td></tr>';
+      px += '<tr><td><span class="prefix-link" onclick="showPrefixDetail(\'' + escAttr(pfx) + '\')">' + escHtml(pfx) + '</span></td><td>' + rpkiIcon(st) + '</td></tr>';
     });
     px += '</tbody></table></div></div>';
   }
@@ -626,19 +1018,29 @@ function renderDashboard(d) {
   ne += '<div class="stat"><div class="stat-val blue">' + nb.downstream_count + '</div><div class="stat-label">Downstreams</div></div>';
   ne += '</div>';
 
-  ne += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">';
+  ne += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem">'; // 3 columns for upstream/downstream/peer
 
   ne += '<div><div style="font-size:.75rem;font-weight:600;color:var(--orange);margin-bottom:.4rem">Top Upstreams</div>';
   ne += '<div class="scroll-wrap"><table class="tbl"><thead><tr><th>ASN</th><th>Name</th><th>Power</th></tr></thead><tbody>';
   (nb.upstreams || []).slice(0, 10).forEach(function(u) {
-    ne += '<tr><td>' + asnLink(u.asn) + '</td><td>' + escHtml(u.name) + '</td><td>' + (u.power || '-') + '</td></tr>';
+    var nameDisplay = (u.name && u.name !== 'AS' + u.asn) ? escHtml(u.name) : '';
+    ne += '<tr><td>' + asnLink(u.asn) + '</td><td>' + nameDisplay + '</td><td>' + (u.power || '-') + '</td></tr>';
+  });
+  ne += '</tbody></table></div></div>';
+
+  ne += '<div><div style="font-size:.75rem;font-weight:600;color:var(--blue);margin-bottom:.4rem">Top Downstreams</div>';
+  ne += '<div class="scroll-wrap"><table class="tbl"><thead><tr><th>ASN</th><th>Name</th><th>Power</th></tr></thead><tbody>';
+  (nb.downstreams || []).slice(0, 10).forEach(function(u) {
+    var nameDisplay = (u.name && u.name !== 'AS' + u.asn) ? escHtml(u.name) : '';
+    ne += '<tr><td>' + asnLink(u.asn) + '</td><td>' + nameDisplay + '</td><td>' + (u.power || '-') + '</td></tr>';
   });
   ne += '</tbody></table></div></div>';
 
   ne += '<div><div style="font-size:.75rem;font-weight:600;color:var(--cyan);margin-bottom:.4rem">Top Peers</div>';
   ne += '<div class="scroll-wrap"><table class="tbl"><thead><tr><th>ASN</th><th>Name</th><th>Power</th></tr></thead><tbody>';
   (nb.peers || []).slice(0, 10).forEach(function(u) {
-    ne += '<tr><td>' + asnLink(u.asn) + '</td><td>' + escHtml(u.name) + '</td><td>' + (u.power || '-') + '</td></tr>';
+    var nameDisplay = (u.name && u.name !== 'AS' + u.asn) ? escHtml(u.name) : '';
+    ne += '<tr><td>' + asnLink(u.asn) + '</td><td>' + nameDisplay + '</td><td>' + (u.power || '-') + '</td></tr>';
   });
   ne += '</tbody></table></div></div>';
 
@@ -655,13 +1057,15 @@ function renderDashboard(d) {
     ixh += '<div class="scroll-wrap"><table class="tbl"><thead><tr><th>IX Name</th><th>Speed</th><th>IPv4</th><th>IPv6</th></tr></thead><tbody>';
     ix.connections.forEach(function(c) {
       const ixUrl = c.ix_id ? 'https://www.peeringdb.com/ix/' + c.ix_id : '#';
-      ixh += '<tr><td><a href="' + ixUrl + '" target="_blank">' + escHtml(c.ix_name) + '</a></td>';
+      ixh += '<tr><td><span class="ix-link" onclick="showIXDetail(' + (c.ix_id || 0) + ', \'' + escAttr(c.ix_name) + '\')">' + escHtml(c.ix_name) + '</span></td>';
       ixh += '<td>' + fmtSpeed(c.speed_mbps) + '</td>';
       ixh += '<td style="font-family:monospace;font-size:.75rem">' + (c.ipv4 || '-') + '</td>';
       ixh += '<td style="font-family:monospace;font-size:.75rem">' + (c.ipv6 || '-') + '</td></tr>';
     });
     ixh += '</tbody></table></div>';
   }
+  // Feature 26: IX traffic stats
+  ixh += renderIxTrafficStats(ix.connections);
   $('ixContent').innerHTML = ixh;
 
   // Facilities
@@ -677,6 +1081,9 @@ function renderDashboard(d) {
     fh += '</tbody></table></div>';
   }
   $('facContent').innerHTML = fh;
+
+  // Feature 24: Render bgp.he.net data
+  renderRoutingOverview(d.bgp_he_net, d.routing);
 }
 
 
@@ -707,12 +1114,12 @@ function renderAtlas(atlas) {
     h += '<div class="expand-toggle" onclick="toggleExpand(this)">Show probe details (' + atlas.probes.length + (atlas.total_probes > atlas.probes.length ? ' of ' + atlas.total_probes : '') + ')</div>';
     h += '<div class="expand-body"><div class="scroll-wrap"><table class="tbl"><thead><tr><th>ID</th><th>Status</th><th>Anchor</th><th>Country</th><th>Prefix</th><th>Description</th></tr></thead><tbody>';
     atlas.probes.forEach(function(p) {
-      var statusClass = p.status === 'Connected' ? 'badge-green' : 'badge-red';
+      var pStatus = typeof p.status === 'object' ? (p.status && p.status.name ? p.status.name : '') : (p.status || p.status_name || ''); var statusClass = pStatus.toLowerCase() === 'connected' ? 'badge-green' : 'badge-red';
       var anchorBadge = p.is_anchor ? '<span class="badge badge-orange">Anchor</span>' : '-';
       var prefix = p.prefix_v4 || p.prefix_v6 || '-';
       h += '<tr>';
       h += '<td><a href="https://atlas.ripe.net/probes/' + p.id + '/" target="_blank" style="color:var(--blue)">' + p.id + '</a></td>';
-      h += '<td><span class="badge ' + statusClass + '">' + escHtml(p.status) + '</span></td>';
+      h += '<td><span class="badge ' + statusClass + '">' + escHtml(pStatus) + '</span></td>';
       h += '<td>' + anchorBadge + '</td>';
       h += '<td>' + countryFlag(p.country) + ' ' + escHtml(p.country) + '</td>';
       h += '<td style="font-family:monospace;font-size:.75rem">' + escHtml(prefix) + '</td>';
@@ -733,6 +1140,7 @@ async function doCompare() {
   if (!raw2) return;
 
   $('compareResults').innerHTML = '<div class="skeleton wide"></div><div class="skeleton med"></div>';
+  doFullCompare();
 
   try {
     const resp = await fetch('/api/compare?asn1=' + currentAsn + '&asn2=' + raw2);
@@ -762,7 +1170,7 @@ async function doCompare() {
     if (d.common_upstreams && d.common_upstreams.length > 0) {
       h += '<div style="font-size:.8rem;font-weight:600;color:var(--yellow);margin:.5rem 0">Common Upstreams (' + d.common_upstreams.length + ')</div>';
       h += '<div style="display:flex;flex-wrap:wrap;gap:.3rem;margin-bottom:.5rem">';
-      d.common_upstreams.forEach(function(u) { h += '<span class="badge badge-orange">' + asnLink(u.asn) + ' ' + escHtml(u.name) + '</span>'; });
+      d.common_upstreams.forEach(function(u) { var nameStr = (u.name && u.name !== 'AS' + u.asn) ? ' ' + escHtml(u.name) : ''; h += '<span class="badge badge-orange">' + asnLink(u.asn) + nameStr + '</span>'; });
       h += '</div>';
     } else if (d.common_upstreams) {
       h += '<div style="font-size:.8rem;color:var(--muted);margin:.5rem 0">No common upstreams detected</div>';
@@ -822,11 +1230,846 @@ function escAttr(s) {
   return escHtml(s);
 }
 
+
+async function loadAspaVerifyData(asn) {
+  $('aspaDeepContent').innerHTML = '<div class="section-loading">Running RFC-compliant ASPA verification...</div>';
+  try {
+    const resp = await fetch('/api/aspa/verify?asn=' + asn);
+    if (!resp.ok) { $('aspaDeepContent').textContent = 'ASPA verification unavailable (server ' + resp.status + ')'; return; }
+    var text = await resp.text();
+    if (!text || text[0] === '<') { $('aspaDeepContent').textContent = 'ASPA verification unavailable (timeout for large ASNs)'; return; }
+    const d = JSON.parse(text);
+    if (d.error) { $('aspaDeepContent').textContent = 'ASPA verification failed: ' + d.error; return; }
+    renderAspaDeep(d);
+  } catch (e) {
+    $('aspaDeepContent').textContent = 'ASPA verification failed: ' + e.message;
+  }
+}
+
+function renderAspaDeep(d) {
+  var h = '';
+  var score = d.readiness_score || { total: 0, breakdown: {} };
+  var pv = d.path_verification || {};
+  var audit = d.provider_audit || {};
+
+  // === READINESS SCORE GAUGE ===
+  h += '<div style="display:grid;grid-template-columns:200px 1fr;gap:2rem;align-items:start;margin-bottom:1.5rem">';
+
+  // Gauge
+  var scoreColor = score.total >= 75 ? 'var(--green)' : score.total >= 50 ? 'var(--orange)' : 'var(--red)';
+  var circumference = 2 * Math.PI * 54;
+  var offset = circumference - (score.total / 100) * circumference;
+  h += '<div>';
+  h += '<div class="aspa-gauge">';
+  h += '<svg viewBox="0 0 120 120"><circle class="aspa-gauge-bg" cx="60" cy="60" r="54"/>';
+  h += '<circle class="aspa-gauge-fill" cx="60" cy="60" r="54" stroke="' + scoreColor + '" stroke-dasharray="' + circumference.toFixed(1) + '" stroke-dashoffset="' + offset.toFixed(1) + '"/></svg>';
+  h += '<div class="aspa-gauge-text"><div class="aspa-gauge-score" style="color:' + scoreColor + '">' + score.total + '</div><div class="aspa-gauge-label">Readiness</div></div>';
+  h += '</div>';
+
+  // ASPA object status below gauge
+  h += '<div style="text-align:center;margin-top:.5rem">';
+  if (d.aspa_object_exists) {
+    h += '<span class="badge badge-green">ASPA Object Found</span>';
+  } else {
+    h += '<span class="badge badge-red">No ASPA Object</span>';
+  }
+  h += '</div>';
+  h += '</div>';
+
+  // Breakdown grid
+  h += '<div>';
+  h += '<div class="aspa-breakdown">';
+
+  var bd = score.breakdown || {};
+  var items = [
+    { key: 'roa_coverage', label: 'ROA Coverage', suffix: '%' },
+    { key: 'aspa_object', label: 'ASPA Object', suffix: '' },
+    { key: 'provider_completeness', label: 'Provider Match', suffix: '%' },
+    { key: 'path_validation', label: 'Path Validation', suffix: '%' },
+  ];
+
+  items.forEach(function(item) {
+    var b = bd[item.key] || { score: 0, max: 25, value: 0 };
+    var pctFill = (b.score / b.max * 100).toFixed(0);
+    var color = pctFill >= 80 ? 'var(--green)' : pctFill >= 50 ? 'var(--orange)' : 'var(--red)';
+    var displayVal = item.key === 'aspa_object' ? (b.value ? 'Yes' : 'No') : b.value + item.suffix;
+    h += '<div class="aspa-breakdown-item">';
+    h += '<div class="aspa-breakdown-label">' + item.label + '</div>';
+    h += '<div class="aspa-breakdown-score" style="color:' + color + '">' + b.score + '<span style="color:var(--dim);font-size:.8rem">/' + b.max + '</span></div>';
+    h += '<div style="font-size:.7rem;color:var(--muted)">' + displayVal + '</div>';
+    h += '<div class="aspa-breakdown-bar"><div style="width:' + pctFill + '%;background:' + color + '"></div></div>';
+    h += '</div>';
+  });
+
+  h += '</div>';
+  h += '</div>';
+  h += '</div>';
+
+  // === PATH VERIFICATION SUMMARY ===
+  h += '<div style="display:flex;gap:1.5rem;flex-wrap:wrap;margin-bottom:1rem;padding:1rem;background:var(--bg);border-radius:8px;border:1px solid var(--border)">';
+  h += '<div class="stat"><div class="stat-val green">' + (pv.valid || 0) + '</div><div class="stat-label">Valid Paths</div></div>';
+  h += '<div class="stat"><div class="stat-val red">' + (pv.invalid || 0) + '</div><div class="stat-label">Invalid Paths</div></div>';
+  h += '<div class="stat"><div class="stat-val">' + (pv.unknown || 0) + '</div><div class="stat-label">Unknown Paths</div></div>';
+  h += '<div class="stat"><div class="stat-val orange">' + (pv.as_set_flagged || 0) + '</div><div class="stat-label">AS_SET Flagged</div></div>';
+  h += '<div class="stat"><div class="stat-val red">' + (pv.valley_detected || 0) + '</div><div class="stat-label">Valley Detected</div></div>';
+  h += '<div class="stat"><div class="stat-val cyan">' + (pv.total || 0) + '</div><div class="stat-label">Total Analyzed</div></div>';
+  h += '</div>';
+
+  // Valid percentage bar
+  if (pv.total > 0) {
+    var vPct = pct(pv.valid, pv.total);
+    var iPct = pct(pv.invalid, pv.total);
+    var uPct = 100 - vPct - iPct;
+    h += '<div style="font-size:.7rem;color:var(--muted);margin-bottom:.25rem">Path Validation: ' + vPct + '% valid, ' + iPct + '% invalid, ' + uPct + '% unknown</div>';
+    h += '<div class="progress-multi"><div style="width:' + vPct + '%;background:var(--green)"></div><div style="width:' + iPct + '%;background:var(--red)"></div><div style="width:' + uPct + '%;background:var(--dim)"></div></div>';
+  }
+
+  // === AS_SET WARNINGS ===
+  if (pv.as_set_flagged > 0) {
+    h += '<div class="asset-alert"><strong>AS_SET Deprecation Warning:</strong> ' + pv.as_set_flagged + ' path(s) contain AS_SET segments. AS_SET is deprecated per RFC 6472 and these paths are automatically marked Invalid per ASPA RFC.</div>';
+    // Show AS_SET paths detail
+    var asSetPaths = (pv.results || []).filter(function(r) { return r.has_as_set; });
+    if (asSetPaths.length > 0) {
+      h += '<div class="expand-toggle" onclick="toggleExpand(this)">Show AS_SET paths (' + asSetPaths.length + ')</div>';
+      h += '<div class="expand-body"><div class="scroll-wrap" style="max-height:200px"><table class="tbl"><thead><tr><th>Prefix</th><th>AS Path</th><th>RRC</th></tr></thead><tbody>';
+      asSetPaths.forEach(function(p) {
+        h += '<tr><td style="font-family:monospace;font-size:.7rem">' + escHtml(p.prefix || '') + '</td>';
+        h += '<td style="font-family:monospace;font-size:.65rem;color:var(--orange)">' + escHtml(p.path || '') + '</td>';
+        h += '<td>' + escHtml(p.rrc || '') + '</td></tr>';
+      });
+      h += '</tbody></table></div></div>';
+    }
+  }
+
+  // === VALLEY DETECTION ALERTS ===
+  if (pv.valley_detected > 0) {
+    var valleyPaths = (pv.results || []).filter(function(r) { return r.valleys && r.valleys.length > 0; });
+    h += '<div class="valley-alert"><strong>Valley Detection:</strong> ' + pv.valley_detected + ' path(s) show potential route leaks (up-down-up pattern).</div>';
+    if (valleyPaths.length > 0) {
+      h += '<div class="expand-toggle" onclick="toggleExpand(this)">Show valley details (' + valleyPaths.length + ' paths)</div>';
+      h += '<div class="expand-body"><div class="scroll-wrap" style="max-height:200px">';
+      valleyPaths.forEach(function(vp) {
+        vp.valleys.forEach(function(v) {
+          h += '<div style="padding:.4rem 0;border-bottom:1px solid var(--border);font-size:.75rem">';
+          h += '<span style="color:var(--red);font-weight:600">Valley:</span> ' + escHtml(v.description);
+          h += '<br><span style="color:var(--muted)">Path segment: ' + v.path_segment.join(' -> ') + '</span>';
+          h += '</div>';
+        });
+      });
+      h += '</div></div>';
+    }
+  }
+
+  // === PROVIDER AUDIT ===
+  h += '<div style="margin-top:1.25rem"><div style="font-size:.85rem;font-weight:600;color:var(--purple);margin-bottom:.5rem">Provider Audit</div>';
+  h += '<div style="display:flex;gap:1.5rem;flex-wrap:wrap;margin-bottom:.75rem">';
+  h += '<div><span style="font-size:.7rem;color:var(--muted);text-transform:uppercase">Detected</span><div style="font-size:1.3rem;font-weight:700;color:var(--blue)">' + (audit.detected_count || 0) + '</div></div>';
+  h += '<div><span style="font-size:.7rem;color:var(--muted);text-transform:uppercase">Declared</span><div style="font-size:1.3rem;font-weight:700;color:var(--cyan)">' + (audit.declared_count || 0) + '</div></div>';
+  h += '<div><span style="font-size:.7rem;color:var(--muted);text-transform:uppercase">Completeness</span><div style="font-size:1.3rem;font-weight:700;color:' + ((audit.completeness_pct || 0) >= 80 ? 'var(--green)' : 'var(--orange)') + '">' + (audit.completeness_pct || 0) + '%</div></div>';
+  h += '</div>';
+
+  // Missing from ASPA (collapsible, sortable)
+  if (audit.missing_from_aspa && audit.missing_from_aspa.length > 0) {
+    window._auditMissing = audit.missing_from_aspa;
+    window._auditMissingSort = 'frequency';
+    h += '<div style="display:flex;align-items:center;gap:.75rem;margin:.5rem 0 .3rem">';
+    h += '<span style="font-size:.8rem;font-weight:600;color:var(--orange)">Missing from ASPA Declaration (' + audit.missing_from_aspa.length + ')</span>';
+    h += '<span class="sort-toggle" onclick="window._auditMissingSort=window._auditMissingSort===\'frequency\'?\'asn\':\'frequency\';renderAuditList(\'missingListEl\',window._auditMissing,window._auditMissingSort,\'missing\')" title="Toggle sort order">Sort: <span id="missingSortLabel">by frequency</span> ↕</span>';
+    h += '</div>';
+    h += '<div id="missingListEl"></div>';
+  }
+
+  // Extra in ASPA (collapsible, sortable)
+  if (audit.extra_in_aspa && audit.extra_in_aspa.length > 0) {
+    window._auditExtra = audit.extra_in_aspa;
+    window._auditExtraSort = 'asn';
+    h += '<div style="display:flex;align-items:center;gap:.75rem;margin:.5rem 0 .3rem">';
+    h += '<span style="font-size:.8rem;font-weight:600;color:var(--cyan)">Extra in ASPA (not seen in paths) (' + audit.extra_in_aspa.length + ')</span>';
+    h += '<span class="sort-toggle" onclick="window._auditExtraSort=window._auditExtraSort===\'asn\'?\'name\':\'asn\';renderAuditList(\'extraListEl\',window._auditExtra,window._auditExtraSort,\'extra\')" title="Toggle sort order">Sort: <span id="extraSortLabel">by ASN</span> ↕</span>';
+    h += '</div>';
+    h += '<div id="extraListEl"></div>';
+  }
+
+  if ((!audit.missing_from_aspa || audit.missing_from_aspa.length === 0) && (!audit.extra_in_aspa || audit.extra_in_aspa.length === 0)) {
+    h += '<div class="audit-row audit-ok">Provider declarations match observed BGP paths</div>';
+  }
+  h += '</div>';
+
+  // === DETECTED PROVIDERS WITH FREQUENCY ===
+  if (d.detected_providers && d.detected_providers.length > 0) {
+    h += '<div style="margin-top:1.25rem"><div style="font-size:.85rem;font-weight:600;color:var(--blue);margin-bottom:.5rem">Detected Providers (by frequency)</div>';
+    h += '<div class="scroll-wrap" style="max-height:200px"><table class="tbl"><thead><tr><th>Provider</th><th>Name</th><th>Seen in Paths</th><th>Frequency</th></tr></thead><tbody>';
+    var sortedProviders = (d.detected_providers || []).slice().sort(function(a, b) { return (b.frequency || 0) - (a.frequency || 0) || a.asn - b.asn; });
+    sortedProviders.forEach(function(p) {
+      h += '<tr><td>' + asnLink(p.asn) + '</td>';
+      var provName = (p.name && p.name !== 'AS' + p.asn) ? escHtml(p.name) : '';
+      h += '<td>' + provName + '</td>';
+      h += '<td>' + (p.frequency || 0) + '</td>';
+      h += '<td><div style="display:flex;align-items:center;gap:.5rem"><div class="progress-wrap" style="flex:1;margin:0"><div class="progress-bar green" style="width:' + (p.frequency_pct || 0) + '%"></div></div><span style="font-size:.7rem;color:var(--muted)">' + (p.frequency_pct || 0) + '%</span></div></td>';
+      h += '</tr>';
+    });
+    h += '</tbody></table></div></div>';
+  }
+
+  // === PATH VERIFICATION DETAILS ===
+  if (pv.results && pv.results.length > 0) {
+    h += '<div style="margin-top:1.25rem">';
+    h += '<div class="expand-toggle" onclick="toggleExpand(this)">Show path verification details (' + pv.results.length + ' paths)</div>';
+    h += '<div class="expand-body"><div class="scroll-wrap" style="max-height:400px"><table class="tbl"><thead><tr><th>RRC</th><th>Prefix</th><th>Path</th><th>Upstream</th><th>Downstream</th><th>Overall</th><th style="min-width:120px">Hop Detail</th></tr></thead><tbody>';
+
+    pv.results.forEach(function(r) {
+      var oBadge = r.overall === 'Valid' ? 'path-valid' : r.overall === 'Invalid' ? 'path-invalid' : 'path-unknown';
+      var uBadge = r.upstream_verification.result === 'Valid' ? 'path-valid' : r.upstream_verification.result === 'Invalid' ? 'path-invalid' : 'path-unknown';
+      var dBadge = r.downstream_verification.result === 'Valid' ? 'path-valid' : r.downstream_verification.result === 'Invalid' ? 'path-invalid' : 'path-unknown';
+
+      h += '<tr>';
+      h += '<td style="font-size:.7rem">' + escHtml(r.rrc || '') + '</td>';
+      h += '<td style="font-family:monospace;font-size:.7rem">' + escHtml(r.prefix || '') + '</td>';
+      h += '<td style="font-family:monospace;font-size:.65rem;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + escAttr(r.collapsed_path || r.path || '') + '">' + escHtml(r.collapsed_path || r.path || '') + '</td>';
+      h += '<td><span class="path-result-badge ' + uBadge + '">' + r.upstream_verification.result + '</span></td>';
+      h += '<td><span class="path-result-badge ' + dBadge + '">' + r.downstream_verification.result + '</span></td>';
+      h += '<td><span class="path-result-badge ' + oBadge + '">' + r.overall + '</span>';
+      if (r.has_as_set) h += '<br><span class="badge badge-orange" style="font-size:.6rem;margin-top:.2rem">AS_SET</span>';
+      if (r.valleys && r.valleys.length > 0) h += '<br><span class="badge badge-red" style="font-size:.6rem;margin-top:.2rem">VALLEY</span>';
+      h += '</td>';
+
+      // Hop detail
+      h += '<td class="hop-detail">';
+      var hops = r.upstream_verification.hops || [];
+      if (hops.length > 0) {
+        hops.forEach(function(hop, idx) {
+          var cls = hop.result === 'ProviderPlus' ? 'hop-pp' : hop.result === 'NotProviderPlus' ? 'hop-npp' : 'hop-na';
+          if (idx > 0) h += '<span class="hop-arrow">,</span>';
+          h += '<span class="' + cls + '" title="AS' + hop.from + '->AS' + hop.to + ': ' + hop.result + '">' + hop.result.charAt(0) + '</span>';
+        });
+      } else {
+        h += '<span style="color:var(--dim)">-</span>';
+      }
+      h += '</td>';
+      h += '</tr>';
+    });
+
+    h += '</tbody></table></div>';
+    h += '<div style="font-size:.65rem;color:var(--dim);margin-top:.5rem">Hop legend: <span class="hop-pp">P</span>=ProviderPlus, <span class="hop-npp">N</span>=NotProviderPlus, <span class="hop-na">N</span>=NoAttestation</div>';
+    h += '</div></div>';
+  }
+
+  h += '<div style="font-size:.7rem;color:var(--dim);margin-top:.75rem">ASPA verification completed in ' + (d.meta ? d.meta.duration_ms : '?') + 'ms | ' + (d.meta ? d.meta.paths_analyzed : '?') + ' of ' + (d.meta ? d.meta.total_paths_seen : '?') + ' paths analyzed</div>';
+  $('aspaDeepContent').innerHTML = h;
+
+  // Initial render of sortable audit lists
+  if (window._auditMissing && window._auditMissing.length > 0) {
+    renderAuditList('missingListEl', window._auditMissing, 'frequency', 'missing');
+  }
+  if (window._auditExtra && window._auditExtra.length > 0) {
+    renderAuditList('extraListEl', window._auditExtra, 'asn', 'extra');
+  }
+}
+
+
+// ============================================================
+// Feature 5: Search History (localStorage)
+// ============================================================
+function loadSearchHistory() {
+  try {
+    return JSON.parse(localStorage.getItem('peercortex_history') || '[]');
+  } catch(e) { return []; }
+}
+
+function saveToHistory(asn, name) {
+  var history = loadSearchHistory();
+  // Remove existing entry for this ASN
+  history = history.filter(function(h) { return h.asn !== asn; });
+  // Add to front
+  history.unshift({ asn: asn, name: name || 'AS' + asn, ts: Date.now() });
+  // Keep only 10
+  history = history.slice(0, 10);
+  localStorage.setItem('peercortex_history', JSON.stringify(history));
+  renderSearchHistory();
+}
+
+function renderSearchHistory() {
+  var history = loadSearchHistory();
+  var el = $('searchHistory');
+  if (!el || history.length === 0) { if(el) el.innerHTML = ''; return; }
+  var h = '<span style="font-size:.7rem;color:var(--dim);margin-right:.3rem">Recent:</span>';
+  history.forEach(function(item) {
+    h += '<span class="history-badge" onclick="lookupAsn(' + item.asn + ')" title="' + escAttr(item.name) + '">AS' + item.asn + '</span>';
+  });
+  h += '<span class="history-clear" onclick="clearHistory()" title="Clear history">x clear</span>';
+  el.innerHTML = h;
+}
+
+function clearHistory() {
+  localStorage.removeItem('peercortex_history');
+  renderSearchHistory();
+}
+
+// ============================================================
+// Feature 3: Prefix Detail View (modal)
+// ============================================================
+async function showPrefixDetail(prefix) {
+  // Create modal
+  var overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.onclick = function(e) { if (e.target === overlay) document.body.removeChild(overlay); };
+  var modal = document.createElement('div');
+  modal.className = 'modal-content';
+  modal.innerHTML = '<button class="modal-close" onclick="this.closest(\'\'.modal-overlay\'\').remove()">&times;</button>' +
+    '<div class="modal-title">Prefix Detail: ' + escHtml(prefix) + '</div>' +
+    '<div class="section-loading">Loading prefix details...</div>';
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+
+  try {
+    var resp = await fetch('/api/prefix/detail?prefix=' + encodeURIComponent(prefix));
+    var d = await resp.json();
+    if (d.error) {
+      modal.innerHTML = '<button class="modal-close" onclick="this.closest(\'.modal-overlay\').remove()">&times;</button>' +
+        '<div class="modal-title">Prefix Detail: ' + escHtml(prefix) + '</div>' +
+        '<div style="color:var(--red)">' + escHtml(d.error) + '</div>';
+      return;
+    }
+
+    var h = '<button class="modal-close" onclick="this.closest(\'.modal-overlay\').remove()">&times;</button>';
+    h += '<div class="modal-title">Prefix Detail: ' + escHtml(prefix) + '</div>';
+
+    // Origins
+    if (d.origins && d.origins.length > 0) {
+      h += '<div style="margin-bottom:.75rem"><span style="font-size:.75rem;color:var(--muted);text-transform:uppercase">Origin AS:</span> ';
+      d.origins.forEach(function(o) { h += asnLink(o.asn) + ' '; });
+      h += '</div>';
+    }
+
+    // RPKI
+    h += '<div style="margin-bottom:.75rem"><span style="font-size:.75rem;color:var(--muted);text-transform:uppercase">RPKI Status:</span> ';
+    var rpkiCls = d.rpki.status === 'valid' ? 'badge-green' : d.rpki.status === 'invalid' ? 'badge-red' : 'badge-orange';
+    h += '<span class="badge ' + rpkiCls + '">' + escHtml(d.rpki.status) + '</span>';
+    h += ' <span style="font-size:.75rem;color:var(--muted)">(' + d.rpki.validating_roas + ' ROAs)</span>';
+    h += '</div>';
+
+    // IRR
+    h += '<div style="margin-bottom:.75rem"><span style="font-size:.75rem;color:var(--muted);text-transform:uppercase">IRR Status:</span> ';
+    h += '<span class="badge ' + (d.irr_status === 'found' ? 'badge-green' : 'badge-orange') + '">' + escHtml(d.irr_status) + '</span></div>';
+
+    // Visibility
+    h += '<div style="margin-bottom:.75rem"><span style="font-size:.75rem;color:var(--muted);text-transform:uppercase">Visibility:</span> ';
+    h += '<span style="font-weight:600;color:var(--blue)">' + (d.visibility.ris_peers_seeing || 0) + '</span>';
+    h += ' <span style="color:var(--muted)">/ ' + (d.visibility.total_probes || 0) + ' RIS peers</span></div>';
+
+    // First seen
+    if (d.first_seen) {
+      h += '<div style="margin-bottom:.75rem"><span style="font-size:.75rem;color:var(--muted);text-transform:uppercase">First Seen:</span> ';
+      h += '<span style="color:var(--text-dim)">' + escHtml(d.first_seen) + '</span></div>';
+    }
+
+    h += '<div style="font-size:.7rem;color:var(--dim);margin-top:.75rem">Queried in ' + d.meta.duration_ms + 'ms</div>';
+    modal.innerHTML = h;
+  } catch(e) {
+    modal.innerHTML = '<button class="modal-close" onclick="this.closest(\'.modal-overlay\').remove()">&times;</button>' +
+      '<div class="modal-title">Prefix Detail</div>' +
+      '<div style="color:var(--red)">Error: ' + escHtml(e.message) + '</div>';
+  }
+}
+
+// ============================================================
+// Feature 4: IX Detail View (modal)
+// ============================================================
+async function showIXDetail(ixId, ixName) {
+  var overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.onclick = function(e) { if (e.target === overlay) document.body.removeChild(overlay); };
+  var modal = document.createElement('div');
+  modal.className = 'modal-content';
+  modal.innerHTML = '<button class="modal-close" onclick="this.closest(\'.modal-overlay\').remove()">&times;</button>' +
+    '<div class="modal-title">IX Detail: ' + escHtml(ixName || 'IX ' + ixId) + '</div>' +
+    '<div class="section-loading">Loading IX details...</div>';
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+
+  try {
+    var resp = await fetch('/api/ix/detail?ix_id=' + ixId);
+    var d = await resp.json();
+    if (d.error) {
+      modal.innerHTML = '<button class="modal-close" onclick="this.closest(\'.modal-overlay\').remove()">&times;</button>' +
+        '<div class="modal-title">IX Detail</div><div style="color:var(--red)">' + escHtml(d.error) + '</div>';
+      return;
+    }
+
+    var h = '<button class="modal-close" onclick="this.closest(\'.modal-overlay\').remove()">&times;</button>';
+    h += '<div class="modal-title">' + escHtml(d.ix.name) + '</div>';
+
+    if (d.ix.city || d.ix.country) {
+      h += '<div style="margin-bottom:.5rem;font-size:.85rem;color:var(--muted)">' + escHtml(d.ix.city) + (d.ix.country ? ', ' + escHtml(d.ix.country) : '') + '</div>';
+    }
+
+    h += '<div style="display:flex;gap:1.5rem;margin-bottom:1rem;flex-wrap:wrap">';
+    h += '<div class="stat"><div class="stat-val green">' + d.total_members + '</div><div class="stat-label">Total Members</div></div>';
+    h += '</div>';
+
+    if (d.ix.website) {
+      h += '<div style="margin-bottom:.5rem"><a href="' + escAttr(d.ix.website) + '" target="_blank" style="font-size:.8rem">' + escHtml(d.ix.website) + '</a></div>';
+    }
+    h += '<div style="margin-bottom:1rem"><a href="' + escAttr(d.ix.peeringdb_url) + '" target="_blank" class="ext-link" style="font-size:.8rem">View on PeeringDB</a></div>';
+
+    // Top members by speed
+    if (d.top_members_by_speed && d.top_members_by_speed.length > 0) {
+      h += '<div style="font-size:.8rem;font-weight:600;color:var(--purple);margin-bottom:.5rem">Top Members by Speed</div>';
+      h += '<div class="scroll-wrap" style="max-height:300px"><table class="tbl"><thead><tr><th>ASN</th><th>Name</th><th>Speed</th></tr></thead><tbody>';
+      d.top_members_by_speed.forEach(function(m) {
+        h += '<tr><td>' + asnLink(m.asn) + '</td><td>' + escHtml(m.name) + '</td><td>' + escHtml(m.speed_display) + '</td></tr>';
+      });
+      h += '</tbody></table></div>';
+    }
+
+    h += '<div style="font-size:.7rem;color:var(--dim);margin-top:.75rem">Queried in ' + d.meta.duration_ms + 'ms</div>';
+    modal.innerHTML = h;
+  } catch(e) {
+    modal.innerHTML = '<button class="modal-close" onclick="this.closest(\'.modal-overlay\').remove()">&times;</button>' +
+      '<div class="modal-title">IX Detail</div><div style="color:var(--red)">Error: ' + escHtml(e.message) + '</div>';
+  }
+}
+
+// ============================================================
+// Feature 8: ASPA Change Alerting
+// ============================================================
+function checkAspaChanges(asn, currentProviders) {
+  var key = 'peercortex_aspa_' + asn;
+  var prev = null;
+  try { prev = JSON.parse(localStorage.getItem(key)); } catch(e) {}
+
+  var card = $('aspaAlertCard');
+  if (!card) return;
+  card.classList.remove('hidden');
+
+  var h = '';
+  var now = new Date().toISOString();
+
+  if (prev && prev.providers) {
+    var prevSet = new Set(prev.providers.map(function(p) { return p.asn; }));
+    var currSet = new Set(currentProviders.map(function(p) { return p.asn; }));
+
+    var added = currentProviders.filter(function(p) { return !prevSet.has(p.asn); });
+    var removed = prev.providers.filter(function(p) { return !currSet.has(p.asn); });
+
+    h += '<div style="font-size:.8rem;color:var(--muted);margin-bottom:.75rem">Last checked: ' + escHtml(prev.timestamp || 'unknown') + '</div>';
+    h += '<div style="font-size:.8rem;color:var(--muted);margin-bottom:.75rem">Current check: ' + escHtml(now) + '</div>';
+
+    if (added.length === 0 && removed.length === 0) {
+      h += '<div style="font-size:.85rem;color:var(--green);font-weight:600">No provider changes detected since last check.</div>';
+    } else {
+      if (added.length > 0) {
+        h += '<div style="font-size:.8rem;font-weight:600;color:var(--green);margin:.5rem 0 .3rem">New Providers Detected (' + added.length + ')</div>';
+        added.forEach(function(p) {
+          h += '<div class="audit-row" style="color:var(--green)">+ ' + asnLink(p.asn) + ' ' + escHtml(p.name || '') + '</div>';
+        });
+      }
+      if (removed.length > 0) {
+        h += '<div style="font-size:.8rem;font-weight:600;color:var(--red);margin:.5rem 0 .3rem">Removed Providers (' + removed.length + ')</div>';
+        removed.forEach(function(p) {
+          h += '<div class="audit-row" style="color:var(--red)">- ' + asnLink(p.asn) + ' ' + escHtml(p.name || '') + '</div>';
+        });
+      }
+    }
+  } else {
+    h += '<div style="font-size:.8rem;color:var(--muted);margin-bottom:.5rem">First check: ' + escHtml(now) + '</div>';
+    h += '<div style="font-size:.85rem;color:var(--muted)">No previous data. Provider snapshot saved for future comparison.</div>';
+  }
+
+  // Save current state
+  localStorage.setItem(key, JSON.stringify({
+    providers: currentProviders,
+    timestamp: now
+  }));
+
+  $('aspaAlertContent').innerHTML = h;
+}
+
+// ============================================================
+// Feature 9: Provider Relationship Graph (SVG)
+// ============================================================
+function renderProviderGraph(asn, providers) {
+  var graphCard = $('providerGraphCard');
+  if (!providers || providers.length === 0) { graphCard.classList.add('hidden'); return; }
+  graphCard.classList.remove('hidden');
+
+  var tier1List = [174, 209, 701, 1239, 1299, 2914, 3257, 3320, 3356, 5511, 6453, 6461, 6762, 6830, 7018, 12956];
+  var tier1 = providers.filter(function(p) { return tier1List.indexOf(p.asn) >= 0; });
+  var transit = providers.filter(function(p) { return tier1List.indexOf(p.asn) < 0 && (p.frequency_pct || 0) >= 20; });
+  var peers = providers.filter(function(p) { return tier1List.indexOf(p.asn) < 0 && (p.frequency_pct || 0) < 20; });
+  tier1.sort(function(a,b) { return (b.frequency_pct||0) - (a.frequency_pct||0); });
+  transit.sort(function(a,b) { return (b.frequency_pct||0) - (a.frequency_pct||0); });
+  peers.sort(function(a,b) { return (b.frequency_pct||0) - (a.frequency_pct||0); });
+
+  function provCard(p, color, label) {
+    var n = escHtml(p.name || '');
+    var f = p.frequency_pct ? p.frequency_pct.toFixed(0) + '%' : '';
+    return '<div onclick="lookupAsn(' + p.asn + ')" style="cursor:pointer;background:' + color + '08;border:1px solid ' + color + '30;border-radius:10px;padding:.65rem .85rem;display:flex;align-items:center;gap:.65rem;transition:all .15s" onmouseenter="this.style.transform=\'translateY(-1px)\';this.style.borderColor=\'' + color + '\'" onmouseleave="this.style.transform=\'none\';this.style.borderColor=\'' + color + '30\'">' +
+      '<div style="width:36px;height:36px;border-radius:50%;background:' + color + '18;border:2px solid ' + color + '60;display:flex;align-items:center;justify-content:center;flex-shrink:0"><span style="font-size:.6rem;font-weight:800;color:' + color + '">' + label + '</span></div>' +
+      '<div style="flex:1;min-width:0"><div style="font-weight:700;font-size:.85rem;color:#e2e8f0">AS' + p.asn + '</div><div style="font-size:.72rem;color:#94a3b8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + n + '</div></div>' +
+      (f ? '<div style="font-size:.72rem;font-weight:700;color:' + color + ';padding:.15rem .45rem;border-radius:5px;background:' + color + '12;flex-shrink:0">' + f + '</div>' : '') +
+    '</div>';
+  }
+
+  var h = '';
+  h += '<div style="text-align:center;margin-bottom:1.5rem"><div style="display:inline-flex;align-items:center;gap:.75rem;background:linear-gradient(135deg,#5b21b6,#7c3aed);padding:.6rem 1.75rem;border-radius:14px;border:2px solid #8b5cf680"><span style="font-size:1.1rem;font-weight:800;color:#fff">AS' + asn + '</span><span style="font-size:.65rem;color:#c4b5fd;text-transform:uppercase;letter-spacing:2px">Target</span></div></div>';
+
+  function section(items, color, title, label, limit) {
+    if (!items.length) return '';
+    var s = '<div style="margin-bottom:1.25rem"><div style="font-size:.7rem;font-weight:700;color:' + color + ';text-transform:uppercase;letter-spacing:.08em;margin-bottom:.5rem;display:flex;align-items:center;gap:.4rem"><span style="width:7px;height:7px;border-radius:50%;background:' + color + '"></span> ' + title + ' (' + items.length + ')</div>';
+    s += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:.4rem">';
+    var show = items.slice(0, limit);
+    show.forEach(function(p) { s += provCard(p, color, label); });
+    s += '</div>';
+    if (items.length > limit) {
+      var moreId = 'pg_more_' + label;
+      s += '<div class="show-more-btn" onclick="var el=document.getElementById(\'' + moreId + '\');if(el.style.display===\'none\'){el.style.display=\'grid\';this.textContent=\'Hide\';}else{el.style.display=\'none\';this.textContent=\'Show ' + (items.length - limit) + ' more...\';}">Show ' + (items.length - limit) + ' more...</div>';
+      s += '<div id="' + moreId + '" style="display:none;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:.4rem">';
+      items.slice(limit).forEach(function(p) { s += provCard(p, color, label); });
+      s += '</div>';
+    }
+    s += '</div>';
+    return s;
+  }
+
+  h += section(tier1, '#fbbf24', 'Tier 1 Providers', 'T1', 20);
+  h += section(transit, '#60a5fa', 'Transit Providers', 'TR', 12);
+  h += section(peers, '#4ade80', 'IX / Peers', 'IX', 12);
+
+  h += '<div style="font-size:.7rem;color:var(--dim);text-align:center;margin-top:.75rem">' + providers.length + ' providers total (Tier 1: ' + tier1.length + ' \u00b7 Transit: ' + transit.length + ' \u00b7 IX/Peer: ' + peers.length + ')</div>';
+
+  $('providerGraphContent').innerHTML = h;
+}
+
+
+// ============================================================
+// Feature 2: Full Compare UI
+// ============================================================
+async function doFullCompare() {
+  if (!currentAsn) return;
+  var raw2 = $('compareAsn').value.trim().replace(/[^0-9]/g, '');
+  if (!raw2) return;
+
+  var panel = $('fullComparePanel');
+  panel.classList.remove('hidden');
+  panel.innerHTML = '<div class="card full"><div class="section-loading">Loading full comparison...</div></div>';
+
+  try {
+    var resp = await fetch('/api/compare?asn1=' + currentAsn + '&asn2=' + raw2);
+    var d = await resp.json();
+    if (d.error) {
+      panel.innerHTML = '<div class="card full"><div style="color:var(--red)">' + escHtml(d.error) + '</div></div>';
+      return;
+    }
+    renderFullCompare(d);
+  } catch(e) {
+    panel.innerHTML = '<div class="card full"><div style="color:var(--red)">Compare failed: ' + escHtml(e.message) + '</div></div>';
+  }
+}
+
+function renderFullCompare(d) {
+  var panel = $('fullComparePanel');
+  var h = '';
+
+  // Header card with both networks
+  h += '<div class="card full">';
+  h += '<div class="card-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 20V10M12 20V4M6 20v-6"/></svg> Network Comparison</div>';
+
+  // Side-by-side metrics
+  h += '<div class="compare-grid">';
+
+  // ASN1 column
+  h += '<div class="compare-col">';
+  h += '<div class="compare-col-title"><span style="color:var(--blue);font-size:1.2rem;font-weight:700">' + escHtml(d.asn1.name) + '</span></div>';
+  h += '<div style="font-size:.85rem;color:var(--muted);margin-bottom:.75rem">AS' + d.asn1.asn + '</div>';
+  h += '<div class="compare-metric"><span class="compare-metric-label">IXPs</span><span class="compare-metric-val" style="color:var(--blue)">' + d.asn1.ix_count + '</span></div>';
+  h += '<div class="compare-metric"><span class="compare-metric-label">Facilities</span><span class="compare-metric-val" style="color:var(--blue)">' + d.asn1.fac_count + '</span></div>';
+  h += '<div class="compare-metric"><span class="compare-metric-label">Upstreams</span><span class="compare-metric-val" style="color:var(--blue)">' + d.asn1.upstream_count + '</span></div>';
+  var r1cls = d.asn1.rpki_coverage >= 90 ? 'green' : d.asn1.rpki_coverage >= 70 ? 'orange' : 'red';
+  h += '<div class="compare-metric"><span class="compare-metric-label">RPKI Coverage</span><span class="compare-metric-val" style="color:var(--' + r1cls + ')">' + d.asn1.rpki_coverage + '%</span></div>';
+  h += '</div>';
+
+  // ASN2 column
+  h += '<div class="compare-col">';
+  h += '<div class="compare-col-title"><span style="color:var(--purple);font-size:1.2rem;font-weight:700">' + escHtml(d.asn2.name) + '</span></div>';
+  h += '<div style="font-size:.85rem;color:var(--muted);margin-bottom:.75rem">AS' + d.asn2.asn + '</div>';
+  h += '<div class="compare-metric"><span class="compare-metric-label">IXPs</span><span class="compare-metric-val" style="color:var(--purple)">' + d.asn2.ix_count + '</span></div>';
+  h += '<div class="compare-metric"><span class="compare-metric-label">Facilities</span><span class="compare-metric-val" style="color:var(--purple)">' + d.asn2.fac_count + '</span></div>';
+  h += '<div class="compare-metric"><span class="compare-metric-label">Upstreams</span><span class="compare-metric-val" style="color:var(--purple)">' + d.asn2.upstream_count + '</span></div>';
+  var r2cls = d.asn2.rpki_coverage >= 90 ? 'green' : d.asn2.rpki_coverage >= 70 ? 'orange' : 'red';
+  h += '<div class="compare-metric"><span class="compare-metric-label">RPKI Coverage</span><span class="compare-metric-val" style="color:var(--' + r2cls + ')">' + d.asn2.rpki_coverage + '%</span></div>';
+  h += '</div>';
+  h += '</div>'; // end compare-grid
+
+  // Common IXPs
+  h += '<div style="margin-top:1.5rem">';
+  h += '<div style="font-size:.85rem;font-weight:600;color:var(--green);margin-bottom:.5rem">Common IXPs (' + d.common_ixps.length + ')</div>';
+  if (d.common_ixps.length > 0) {
+    h += '<div style="display:flex;flex-wrap:wrap;gap:.3rem;margin-bottom:.75rem">';
+    d.common_ixps.forEach(function(ix) { h += '<span class="badge badge-green">' + escHtml(ix.name) + '</span>'; });
+    h += '</div>';
+  } else {
+    h += '<div style="font-size:.8rem;color:var(--muted);margin-bottom:.75rem">No common IXPs</div>';
+  }
+
+  // Only in ASN1
+  h += '<div style="font-size:.85rem;font-weight:600;color:var(--blue);margin-bottom:.5rem">Only in AS' + d.asn1.asn + ' (' + d.only_asn1_ixps.length + ')</div>';
+  if (d.only_asn1_ixps.length > 0) {
+    h += '<div style="display:flex;flex-wrap:wrap;gap:.3rem;margin-bottom:.75rem">';
+    d.only_asn1_ixps.slice(0, 30).forEach(function(ix) { h += '<span class="badge badge-blue">' + escHtml(ix.name) + '</span>'; });
+    if (d.only_asn1_ixps.length > 30) h += '<span class="badge badge-blue">+' + (d.only_asn1_ixps.length - 30) + ' more</span>';
+    h += '</div>';
+  }
+
+  // Only in ASN2
+  h += '<div style="font-size:.85rem;font-weight:600;color:var(--purple);margin-bottom:.5rem">Only in AS' + d.asn2.asn + ' (' + d.only_asn2_ixps.length + ')</div>';
+  if (d.only_asn2_ixps.length > 0) {
+    h += '<div style="display:flex;flex-wrap:wrap;gap:.3rem;margin-bottom:.75rem">';
+    d.only_asn2_ixps.slice(0, 30).forEach(function(ix) { h += '<span class="badge badge-purple">' + escHtml(ix.name) + '</span>'; });
+    if (d.only_asn2_ixps.length > 30) h += '<span class="badge badge-purple">+' + (d.only_asn2_ixps.length - 30) + ' more</span>';
+    h += '</div>';
+  }
+
+  // Common upstreams
+  if (d.common_upstreams && d.common_upstreams.length > 0) {
+    h += '<div style="font-size:.85rem;font-weight:600;color:var(--orange);margin-bottom:.5rem">Common Upstreams (' + d.common_upstreams.length + ')</div>';
+    h += '<div style="display:flex;flex-wrap:wrap;gap:.3rem;margin-bottom:.75rem">';
+    d.common_upstreams.forEach(function(u) { h += '<span class="badge badge-orange">' + asnLink(u.asn) + ' ' + escHtml(u.name || '') + '</span>'; });
+    h += '</div>';
+  }
+
+  // Common facilities
+  if (d.common_facilities && d.common_facilities.length > 0) {
+    h += '<div style="font-size:.85rem;font-weight:600;color:var(--cyan);margin-bottom:.5rem">Common Facilities (' + d.common_facilities.length + ')</div>';
+    h += '<div style="display:flex;flex-wrap:wrap;gap:.3rem;margin-bottom:.75rem">';
+    d.common_facilities.forEach(function(f) { h += '<span class="badge badge-cyan">' + escHtml(f.name) + '</span>'; });
+    h += '</div>';
+  }
+
+  h += '</div>';
+  h += '<div style="font-size:.7rem;color:var(--dim);margin-top:.75rem">Compared in ' + d.meta.duration_ms + 'ms</div>';
+  h += '</div>'; // end card
+
+  panel.innerHTML = h;
+  // Scroll into view
+  panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+
+
+
+// ============================================================
+// Feature 24: Routing Overview (enhanced bgp.he.net + RIPE visibility)
+// ============================================================
+function renderRoutingOverview(heData, routing) {
+  var hasHe = heData && (heData.peer_count || heData.prefixes_v4 || heData.prefixes_v6 || heData.country);
+  var hasRouting = routing && (routing.ipv4_prefixes > 0 || routing.ipv6_prefixes > 0);
+  if (!hasHe && !hasRouting) { $('bgpHeCard').classList.add('hidden'); return; }
+  $('bgpHeCard').classList.remove('hidden');
+
+  var r = routing || {};
+  var he = heData || {};
+  var v4p = r.ipv4_prefixes || he.prefixes_v4 || 0;
+  var v6p = r.ipv6_prefixes || he.prefixes_v6 || 0;
+  var peers = he.peer_count || 0;
+  var h = '';
+
+  // Top stat cards
+  h += '<div class="routing-stats-row">';
+  h += '<div class="routing-stat-card"><div class="routing-stat-val" style="color:var(--green)">' + v4p + '</div><div class="routing-stat-label">IPv4 Prefixes</div></div>';
+  h += '<div class="routing-stat-card"><div class="routing-stat-val" style="color:var(--purple)">' + v6p + '</div><div class="routing-stat-label">IPv6 Prefixes</div></div>';
+  if (peers > 0) {
+    h += '<div class="routing-stat-card"><div class="routing-stat-val" style="color:var(--cyan)">' + peers + '</div><div class="routing-stat-label">Observed Peers</div></div>';
+  }
+  h += '</div>';
+
+  // Propagation bars
+  function propColor(pct) { return pct >= 90 ? 'green' : pct >= 70 ? 'orange' : 'red'; }
+  function propBar(label, pct, totalPeers, pfxCount) {
+    if (pfxCount <= 0) return '';
+    var seenBy = Math.round(pct / 100 * totalPeers);
+    var barId = 'prop-' + label.replace(/\s/g,'').toLowerCase() + '-' + Math.random().toString(36).substr(2,5);
+    var s = '<div class="prop-section">';
+    s += '<div class="prop-label">' + label + '</div>';
+    s += '<div class="prop-bar-wrap">';
+    s += '<div class="prop-bar"><div class="prop-fill ' + propColor(pct) + '" id="' + barId + '" data-width="' + Math.min(pct, 100) + '%"></div></div>';
+    s += '<div class="prop-pct" style="color:var(--' + propColor(pct) + ')">' + pct.toFixed(1) + '%</div>';
+    s += '</div>';
+    if (totalPeers > 0) {
+      s += '<div class="prop-detail">Seen by ' + seenBy + ' of ' + totalPeers + ' RIS peers</div>';
+    }
+    s += '</div>';
+    return s;
+  }
+
+  if (r.ipv4_visibility_avg > 0 || r.ipv6_visibility_avg > 0) {
+    h += propBar('IPv4 Route Propagation', r.ipv4_visibility_avg || 0, r.total_ris_peers_v4 || 0, v4p);
+    h += propBar('IPv6 Route Propagation', r.ipv6_visibility_avg || 0, r.total_ris_peers_v6 || 0, v6p);
+  }
+
+  // Prefix distribution
+  var psv4 = (r.prefix_sizes_v4 || []);
+  var psv6 = (r.prefix_sizes_v6 || []);
+  if (psv4.length > 0 || psv6.length > 0) {
+    h += '<div class="prefix-dist">';
+    h += '<div class="prefix-dist-label">Prefix Distribution</div>';
+    h += '<div class="prefix-badges">';
+    if (psv4.length > 0) {
+      psv4.forEach(function(p) {
+        h += '<span class="prefix-badge" style="border-color:var(--green);color:var(--green)">/' + p.size + ' \u00d7' + p.count + '</span>';
+      });
+    }
+    if (psv6.length > 0) {
+      psv6.forEach(function(p) {
+        h += '<span class="prefix-badge" style="border-color:var(--purple);color:var(--purple)">/' + p.size + ' \u00d7' + p.count + '</span>';
+      });
+    }
+    h += '</div></div>';
+  }
+
+  // Footer: country + links
+  h += '<div class="routing-footer">';
+  h += '<div class="routing-footer-left">';
+  if (he.country) {
+    h += '<span>' + escHtml(he.country) + '</span>';
+  }
+  if (he.irr_record) {
+    h += '<span style="color:var(--dim)">|</span><span style="color:var(--muted)">IRR: ' + escHtml(he.irr_record) + '</span>';
+  }
+  if (he.looking_glass) {
+    h += '<span style="color:var(--dim)">|</span><a class="ext-link" href="' + escAttr(he.looking_glass) + '" target="_blank">Looking Glass</a>';
+  }
+  h += '</div>';
+  if (he.source_url) {
+    h += '<a class="ext-link" href="' + escAttr(he.source_url) + '" target="_blank">View on bgp.he.net \u2192</a>';
+  }
+  h += '</div>';
+
+  $('bgpHeContent').innerHTML = h;
+
+  // Animate propagation bars after render
+  setTimeout(function() {
+    var fills = document.querySelectorAll('.prop-fill[data-width]');
+    fills.forEach(function(el) { el.style.width = el.getAttribute('data-width'); });
+  }, 50);
+}
+
+// Keep backward-compat alias
+function renderBgpHeNet(data) {
+  renderRoutingOverview(data, null);
+}
+
+// ============================================================
+// Feature 26: IX Traffic Stats
+// ============================================================
+function renderIxTrafficStats(ixConnections) {
+  var totalSpeed = (ixConnections || []).reduce(function(sum, c) { return sum + (c.speed_mbps || 0); }, 0);
+  var decixConns = (ixConnections || []).filter(function(c) { return (c.ix_name || '').toLowerCase().indexOf('de-cix') >= 0; });
+  var h = '';
+  if (totalSpeed > 0 || decixConns.length > 0) {
+    h += '<div class="ix-traffic-stats">';
+    h += '<div class="ix-traffic-stat"><div class="ix-traffic-val">' + fmtSpeed(totalSpeed) + '</div><div class="ix-traffic-label">Total IX Capacity</div></div>';
+    if (decixConns.length > 0) {
+      var decixSpeed = decixConns.reduce(function(sum, c) { return sum + (c.speed_mbps || 0); }, 0);
+      h += '<div class="ix-traffic-stat"><div class="ix-traffic-val">' + decixConns.length + '</div><div class="ix-traffic-label">DE-CIX Ports</div></div>';
+      h += '<div class="ix-traffic-stat"><div class="ix-traffic-val">' + fmtSpeed(decixSpeed) + '</div><div class="ix-traffic-label">DE-CIX Capacity</div></div>';
+    }
+    var ixByName = {};
+    (ixConnections || []).forEach(function(c) {
+      var name = c.ix_name || 'Unknown';
+      if (!ixByName[name]) ixByName[name] = { name: name, total_speed: 0, ports: 0 };
+      ixByName[name].total_speed += c.speed_mbps || 0;
+      ixByName[name].ports++;
+    });
+    var topIx = Object.values(ixByName).sort(function(a, b) { return b.total_speed - a.total_speed; }).slice(0, 5);
+    if (topIx.length > 0) {
+      h += '<div class="ix-traffic-stat" style="flex:1;min-width:200px"><div class="ix-traffic-label" style="text-align:left;margin-bottom:.3rem">Top IXPs by Capacity</div>';
+      topIx.forEach(function(ix) {
+        var pctOfTotal = totalSpeed > 0 ? Math.round((ix.total_speed / totalSpeed) * 100) : 0;
+        h += '<div style="display:flex;align-items:center;gap:.5rem;font-size:.75rem;margin-bottom:.2rem">';
+        h += '<span style="color:var(--text-dim);min-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + escHtml(ix.name) + '</span>';
+        h += '<div class="progress-wrap" style="flex:1;margin:0;height:6px"><div class="progress-bar blue" style="width:' + pctOfTotal + '%"></div></div>';
+        h += '<span style="color:var(--muted);min-width:60px;text-align:right">' + fmtSpeed(ix.total_speed) + '</span>';
+        h += '</div>';
+      });
+      h += '</div>';
+    }
+    h += '</div>';
+  }
+  return h;
+}
+
+// ============================================================
+// Feature 27: WHOIS rendering
+// ============================================================
+async function loadWhoisData(asn) {
+  $('whoisContent').innerHTML = '<div class="section-loading">Loading WHOIS data...</div>';
+  try {
+    var resp = await fetch('/api/whois?resource=AS' + asn);
+    var d = await resp.json();
+    if (d.error) { $('whoisContent').innerHTML = '<div style="color:var(--orange);font-size:.85rem">WHOIS: ' + escHtml(d.error) + '</div>'; return; }
+    renderWhois(d);
+  } catch (e) {
+    $('whoisContent').innerHTML = '<div style="color:var(--red);font-size:.85rem">WHOIS lookup failed: ' + escHtml(e.message) + '</div>';
+  }
+}
+
+function renderWhois(d) {
+  var h = '';
+  var data = d.data;
+  if (!data) { $('whoisContent').innerHTML = '<div style="color:var(--muted);font-size:.85rem">No WHOIS data found for ' + escHtml(d.resource) + '</div>'; return; }
+  if (Array.isArray(data)) { if (data.length === 0) { $('whoisContent').innerHTML = '<div style="color:var(--muted)">No results.</div>'; return; } data = data[0]; }
+  h += '<div style="font-size:.8rem;color:var(--muted);margin-bottom:.75rem">Source: RIPE DB | Type: ' + escHtml(d.type || 'unknown') + '</div>';
+  h += '<div class="expand-toggle" onclick="toggleExpand(this)">Show WHOIS details</div>';
+  h += '<div class="expand-body"><div class="whois-grid">';
+  var fields = [
+    ['aut-num / inetnum', data.aut_num || data.inetnum || ''],
+    ['AS Name / Netname', data.as_name || data.netname || ''],
+    ['Description', (data.descr || []).join(', ')],
+    ['Organisation', data.org || ''],
+    ['Country', data.country || ''],
+    ['Admin-C', (data.admin_c || []).join(', ')],
+    ['Tech-C', (data.tech_c || []).join(', ')],
+    ['Maintained By', (data.mnt_by || []).join(', ')],
+    ['Status', data.status || ''],
+    ['Created', data.created || ''],
+    ['Last Modified', data.last_modified || ''],
+    ['Source', data.source || ''],
+  ];
+  fields.forEach(function(f) {
+    if (f[1]) { h += '<div class="whois-key">' + escHtml(f[0]) + '</div><div class="whois-val">' + escHtml(f[1]) + '</div>'; }
+  });
+  h += '</div>';
+  if (data.import && data.import.length > 0) {
+    h += '<div style="margin-top:.75rem;font-size:.8rem;font-weight:600;color:var(--orange)">Import Policy</div>';
+    h += '<div style="font-family:monospace;font-size:.7rem;color:var(--text-dim);max-height:150px;overflow-y:auto">';
+    data.import.forEach(function(imp) { h += escHtml(imp) + '<br>'; });
+    h += '</div>';
+  }
+  if (data.export && data.export.length > 0) {
+    h += '<div style="margin-top:.5rem;font-size:.8rem;font-weight:600;color:var(--cyan)">Export Policy</div>';
+    h += '<div style="font-family:monospace;font-size:.7rem;color:var(--text-dim);max-height:150px;overflow-y:auto">';
+    data.export.forEach(function(exp) { h += escHtml(exp) + '<br>'; });
+    h += '</div>';
+  }
+  if (data.remarks && data.remarks.length > 0) {
+    h += '<div style="margin-top:.5rem;font-size:.8rem;font-weight:600;color:var(--muted)">Remarks</div>';
+    h += '<div style="font-family:monospace;font-size:.7rem;color:var(--dim);max-height:150px;overflow-y:auto">';
+    data.remarks.forEach(function(r) { h += escHtml(r) + '<br>'; });
+    h += '</div>';
+  }
+  h += '</div>';
+  h += '<div style="font-size:.7rem;color:var(--dim);margin-top:.5rem">Queried in ' + (d.meta ? d.meta.duration_ms : '?') + 'ms</div>';
+  $('whoisContent').innerHTML = h;
+}
+
+
 $('asnInput').addEventListener('keydown', function(e) {
   if (e.key === 'Enter') doLookup();
 });
 
 (function() {
+  renderSearchHistory();
   const params = new URLSearchParams(window.location.search);
   const asn = params.get('asn');
   if (asn) {
@@ -834,6 +2077,366 @@ $('asnInput').addEventListener('keydown', function(e) {
     doLookup();
   }
 })();
+
+async function loadHealthReport(asn) {
+  $('healthContent').innerHTML = '<div class="section-loading">Running comprehensive validation (13 checks)...</div>';
+  try {
+    var resp = await fetch('/api/validate?asn=' + asn);
+    var d = await resp.json();
+    if (d.error) {
+      $('healthContent').innerHTML = '<div style="color:var(--red);font-size:.85rem">Validation failed: ' + escHtml(d.error) + '</div>';
+      return;
+    }
+    renderHealthReport(d);
+  } catch (e) {
+    $('healthContent').innerHTML = '<div style="color:var(--red);font-size:.85rem">Validation failed: ' + escHtml(e.message) + '</div>';
+  }
+}
+
+
+function buildHealthTooltip(key, v, info) {
+  var t = '';
+  var isFail = v.status === 'fail' || v.status === 'warning';
+
+  // What was checked
+  t += '<div class="tt-section"><span class="tt-label">Checked: </span><span class="tt-value">';
+
+  if (key === 'bogon') {
+    t += 'Scanned ' + (v.total_prefixes_checked || 0) + ' prefixes against RFC 1918/5737/6598 bogon ranges and reserved ASN lists.';
+    t += '</span></div>';
+    t += '<div class="tt-section"><span class="tt-label">Result: </span><span class="tt-value">';
+    if (v.bogon_prefixes && v.bogon_prefixes.length > 0) {
+      t += v.bogon_prefixes.length + ' bogon prefix(es) found: ' + v.bogon_prefixes.map(function(b){return b.prefix}).join(', ');
+    } else { t += 'No bogon prefixes detected.'; }
+    if (v.bogon_asns_in_paths && v.bogon_asns_in_paths.length > 0) { t += ' Bogon ASNs in paths: ' + v.bogon_asns_in_paths.join(', '); }
+    t += '</span></div>';
+    t += '<div class="tt-section"><span class="tt-label">Why it matters: </span><span class="tt-value">Bogon announcements indicate misconfiguration or prefix hijacking.</span></div>';
+    if (isFail) t += '<div class="tt-section tt-fix">Fix: Remove bogon prefixes from BGP announcements and add prefix filters.</div>';
+
+  } else if (key === 'rpki_completeness') {
+    t += (v.with_roa || 0) + ' of ' + (v.total_checked || 0) + ' prefixes have valid ROAs (' + (v.coverage_pct || 0) + '% coverage).';
+    t += '</span></div>';
+    t += '<div class="tt-section"><span class="tt-label">Result: </span><span class="tt-value">';
+    if (v.over_specific && v.over_specific.length > 0) { t += 'Over-specific prefixes (/25+): ' + v.over_specific.join(', ') + '. '; }
+    t += (v.coverage_pct || 0) + '% ROA coverage.';
+    t += '</span></div>';
+    t += '<div class="tt-section"><span class="tt-label">Why it matters: </span><span class="tt-value">ROAs protect against origin hijacking by validating the authorized origin AS for each prefix.</span></div>';
+    if (isFail) t += '<div class="tt-section tt-fix">Fix: Create ROAs in your RIR portal for all announced prefixes with correct origin ASN and max-length.</div>';
+
+  } else if (key === 'resource_cert') {
+    t += 'Checked RPKI CA and ROA existence for announced prefixes.';
+    t += '</span></div>';
+    t += '<div class="tt-section"><span class="tt-label">Result: </span><span class="tt-value">';
+    t += (v.roa_count || 0) + ' ROA(s) found across ' + (v.checked || 0) + ' prefixes \u2014 RPKI CA is ' + (v.has_roas ? 'active' : 'missing') + '.';
+    t += '</span></div>';
+    t += '<div class="tt-section"><span class="tt-label">Why it matters: </span><span class="tt-value">Without an RPKI CA, no origin validation protection exists for your prefixes.</span></div>';
+    if (isFail) t += '<div class="tt-section tt-fix">Fix: Set up an RPKI CA through your RIR (RIPE, ARIN, APNIC) and publish ROAs for all prefixes.</div>';
+
+  } else if (key === 'blocklist') {
+    t += 'Scanned ' + (v.checked || 0) + ' prefixes against Spamhaus DROP/EDROP and other blocklists.';
+    t += '</span></div>';
+    t += '<div class="tt-section"><span class="tt-label">Result: </span><span class="tt-value">';
+    if (v.listed_prefixes && v.listed_prefixes.length > 0) {
+      t += v.listed_prefixes.length + ' prefix(es) listed: ';
+      v.listed_prefixes.forEach(function(lp) { t += lp.prefix + ' (' + (lp.sources||[]).join(', ') + ') '; });
+    } else { t += 'No blocklist entries found.'; }
+    t += '</span></div>';
+    t += '<div class="tt-section"><span class="tt-label">Why it matters: </span><span class="tt-value">Blocklisted prefixes indicate abuse, compromise, or hijacking and cause traffic to be rejected.</span></div>';
+    if (isFail) t += '<div class="tt-section tt-fix">Fix: Investigate abuse sources, contact the blocklist operator for delisting, and implement BCP38 source validation.</div>';
+
+  } else if (key === 'irr') {
+    t += 'Compared BGP-observed origins with IRR route objects for ' + (v.total_entries || 0) + ' entries.';
+    t += '</span></div>';
+    t += '<div class="tt-section"><span class="tt-label">Result: </span><span class="tt-value">';
+    t += (v.total_entries || 0) + ' IRR entries checked, ' + (v.mismatch_count || 0) + ' mismatch(es).';
+    if (v.mismatches && v.mismatches.length > 0) { t += ' Mismatched: ' + v.mismatches.slice(0,3).map(function(m){return m.prefix}).join(', '); }
+    t += '</span></div>';
+    t += '<div class="tt-section"><span class="tt-label">Why it matters: </span><span class="tt-value">IRR objects are used by peers for automated prefix filtering \u2014 mismatches may cause routes to be rejected.</span></div>';
+    if (isFail) t += '<div class="tt-section tt-fix">Fix: Create or update route/route6 objects in the appropriate IRR database (RIPE, RADB, etc.).</div>';
+
+  } else if (key === 'abuse_contact') {
+    t += 'Verified abuse contact email in RIR database and checked MX record validity.';
+    t += '</span></div>';
+    t += '<div class="tt-section"><span class="tt-label">Result: </span><span class="tt-value">';
+    t += 'Contacts: ' + (v.contacts && v.contacts.length > 0 ? v.contacts.join(', ') : 'none') + '. Valid email: ' + (v.has_valid_email ? 'Yes' : 'No') + '.';
+    t += '</span></div>';
+    t += '<div class="tt-section"><span class="tt-label">Why it matters: </span><span class="tt-value">A valid abuse contact is required by RIPE policy ripe-786 and essential for incident response.</span></div>';
+    if (isFail) t += '<div class="tt-section tt-fix">Fix: Update the abuse-c attribute on your aut-num object with a valid, monitored email address with working MX records.</div>';
+
+  } else if (key === 'manrs') {
+    t += 'Checked MANRS (Mutually Agreed Norms for Routing Security) participation status.';
+    t += '</span></div>';
+    t += '<div class="tt-section"><span class="tt-label">Result: </span><span class="tt-value">';
+    t += 'Participant: ' + (v.participant ? 'Yes' : 'No');
+    if (v.score !== undefined) t += ', Conformance score: ' + v.score + '%';
+    t += '.</span></div>';
+    t += '<div class="tt-section"><span class="tt-label">Why it matters: </span><span class="tt-value">MANRS participation is a trust signal demonstrating commitment to routing security best practices.</span></div>';
+    if (isFail) t += '<div class="tt-section tt-fix">Fix: Join MANRS at manrs.org \u2014 implement filtering, anti-spoofing, coordination, and global validation.</div>';
+
+  } else if (key === 'visibility') {
+    t += 'Measured prefix visibility across ' + (v.total_rrcs || 0) + ' RIPE RIS route collectors.';
+    t += '</span></div>';
+    t += '<div class="tt-section"><span class="tt-label">Result: </span><span class="tt-value">';
+    t += 'Seen by ' + (v.seen_by || 0) + ' of ' + (v.total_rrcs || 0) + ' RRCs (' + (v.visibility_score || 0) + '%). Origin changes: ' + (v.origin_changes || 0) + '.';
+    t += '</span></div>';
+    t += '<div class="tt-section"><span class="tt-label">Why it matters: </span><span class="tt-value">Low BGP visibility means routing problems, poor reachability, or possible prefix hijacking.</span></div>';
+    if (isFail) t += '<div class="tt-section tt-fix">Fix: Verify BGP sessions are up, check prefix filters at upstreams, and ensure prefixes are not too specific (/25+).</div>';
+
+  } else if (key === 'rdns') {
+    t += 'Checked reverse DNS (PTR) delegation for announced prefixes.';
+    t += '</span></div>';
+    t += '<div class="tt-section"><span class="tt-label">Result: </span><span class="tt-value">';
+    t += (v.coverage_pct || 0) + '% rDNS coverage across ' + (v.checked || 0) + ' prefixes checked.';
+    t += '</span></div>';
+    t += '<div class="tt-section"><span class="tt-label">Why it matters: </span><span class="tt-value">Missing reverse DNS causes email rejection, breaks traceroute readability, and indicates poor network hygiene.</span></div>';
+    if (isFail) t += '<div class="tt-section tt-fix">Fix: Set up rDNS delegations in your RIR portal and configure PTR records on your authoritative DNS servers.</div>';
+
+  } else if (key === 'rpsl') {
+    t += 'Looked up aut-num object in IRR for routing policy declarations.';
+    t += '</span></div>';
+    t += '<div class="tt-section"><span class="tt-label">Result: </span><span class="tt-value">';
+    t += 'aut-num: ' + (v.exists ? 'Exists' : 'Missing');
+    if (v.exists) { t += '. Import policy: ' + (v.has_import ? 'Yes' : 'No') + ', Export policy: ' + (v.has_export ? 'Yes' : 'No'); }
+    t += '.</span></div>';
+    t += '<div class="tt-section"><span class="tt-label">Why it matters: </span><span class="tt-value">Well-maintained IRR aut-num objects enable automated peering setup and prefix filtering.</span></div>';
+    if (isFail) t += '<div class="tt-section tt-fix">Fix: Create an aut-num object with import/export/mp-import/mp-export policies in your RIR\'s IRR database.</div>';
+
+  } else if (key === 'ix_route_server') {
+    t += 'Checked route server participation across ' + (v.total_ix_connections || 0) + ' IX connections.';
+    t += '</span></div>';
+    t += '<div class="tt-section"><span class="tt-label">Result: </span><span class="tt-value">';
+    t += (v.rs_peer_count || 0) + ' of ' + (v.total_ix_connections || 0) + ' IX connections use route servers (' + (v.rs_peer_pct || 0) + '%).';
+    if (v.message) t += ' ' + v.message;
+    t += '</span></div>';
+    t += '<div class="tt-section"><span class="tt-label">Why it matters: </span><span class="tt-value">Route server participation means RPKI-based filtering is applied, improving routing security.</span></div>';
+    if (isFail) t += '<div class="tt-section tt-fix">Fix: Enable route server peering at your IXPs \u2014 most IXPs offer this for free with RPKI filtering.</div>';
+
+  } else if (key === 'communities') {
+    t += 'Analyzed BGP community usage across ' + (v.total_updates || 0) + ' BGP updates.';
+    t += '</span></div>';
+    t += '<div class="tt-section"><span class="tt-label">Result: </span><span class="tt-value">';
+    t += (v.unique_communities || 0) + ' unique communities found.';
+    if (v.well_known_detected && v.well_known_detected.length > 0) {
+      t += ' Well-known: ' + v.well_known_detected.map(function(c){return c.community + ' (' + c.well_known + ')'}).join(', ') + '.';
+    }
+    t += '</span></div>';
+    t += '<div class="tt-section"><span class="tt-label">Why it matters: </span><span class="tt-value">BGP communities reveal routing policy sophistication and enable traffic engineering control.</span></div>';
+    if (isFail) t += '<div class="tt-section tt-fix">Fix: Implement BGP community tagging for traffic engineering and use well-known communities (blackhole, no-export) where appropriate.</div>';
+
+  } else if (key === 'geolocation') {
+    t += 'Compared prefix geolocation data with PeeringDB facility locations.';
+    t += '</span></div>';
+    t += '<div class="tt-section"><span class="tt-label">Result: </span><span class="tt-value">';
+    t += 'Geo countries: ' + ((v.geo_countries || []).join(', ') || 'unknown');
+    if (v.pdb_facility_countries && v.pdb_facility_countries.length > 0) { t += '. PDB facilities: ' + v.pdb_facility_countries.join(', '); }
+    if (v.country_mismatches && v.country_mismatches.length > 0) { t += '. Mismatches: ' + v.country_mismatches.join(', '); }
+    t += '.</span></div>';
+    t += '<div class="tt-section"><span class="tt-label">Why it matters: </span><span class="tt-value">Geolocation mismatches between announced prefixes and facility locations can indicate prefix hijacking.</span></div>';
+    if (isFail) t += '<div class="tt-section tt-fix">Fix: Update geofeed data, verify PeeringDB facility records, and check for unauthorized prefix announcements.</div>';
+
+  } else {
+    t += info.desc;
+    t += '</span></div>';
+    t += '<div class="tt-section"><span class="tt-label">Result: </span><span class="tt-value">' + (v.message || v.status || 'Unknown') + '</span></div>';
+  }
+
+  return t;
+}
+
+function renderHealthReport(d) {
+  var h = '';
+  var score = d.health_score || 0;
+  var scoreColor = score >= 80 ? 'var(--green)' : score >= 60 ? 'var(--orange)' : 'var(--red)';
+  var circumference = 2 * Math.PI * 54;
+  var offset = circumference - (score / 100) * circumference;
+
+  h += '<div style="display:grid;grid-template-columns:200px 1fr;gap:2rem;align-items:start;margin-bottom:1.5rem">';
+
+  // Gauge
+  h += '<div>';
+  h += '<div class="health-gauge">';
+  h += '<svg viewBox="0 0 120 120"><circle class="health-gauge-bg" cx="60" cy="60" r="54"/>';
+  h += '<circle class="health-gauge-fill" cx="60" cy="60" r="54" stroke="' + scoreColor + '" stroke-dasharray="' + circumference.toFixed(1) + '" stroke-dashoffset="' + offset.toFixed(1) + '"/></svg>';
+  h += '<div class="health-gauge-text"><div class="health-gauge-score" style="color:' + scoreColor + '">' + score + '</div><div class="health-gauge-label">Health Score</div></div>';
+  h += '</div>';
+  h += '<div style="text-align:center;font-size:.8rem;color:var(--muted);margin-top:.5rem">' + escHtml(d.name || '') + '</div>';
+  h += '</div>';
+
+  // Checks grid
+  h += '<div><div class="health-checks">';
+
+  var checkLabels = {
+    bogon: { label: "Bogon Detection", desc: "RFC 1918, RFC 5737, CGN & reserved ASNs" },
+    irr: { label: "IRR Validation", desc: "BGP vs IRR origin consistency" },
+    rpki_completeness: { label: "RPKI ROA Coverage", desc: "ROA coverage and over-specific prefixes" },
+    abuse_contact: { label: "Abuse Contact", desc: "Valid abuse email in RIR database" },
+    blocklist: { label: "Blocklist Check", desc: "Spamhaus DROP and blocklist status" },
+    manrs: { label: "MANRS Compliance", desc: "MANRS participation and conformance" },
+    rdns: { label: "Reverse DNS", desc: "rDNS delegation for prefixes" },
+    visibility: { label: "BGP Visibility", desc: "Route visibility across RIS collectors" },
+    communities: { label: "BGP Communities", desc: "Well-known community usage" },
+    geolocation: { label: "Geolocation", desc: "Geo vs PeeringDB facility verification" },
+    rpsl: { label: "IRR Object", desc: "aut-num with routing policy" },
+    ix_route_server: { label: "IX Route Servers", desc: "Route server peering participation" },
+    resource_cert: { label: "Resource Cert", desc: "RPKI CA / ROA existence" }
+  };
+
+  var checkOrder = ["bogon","rpki_completeness","resource_cert","blocklist","irr","abuse_contact","manrs","visibility","rdns","rpsl","ix_route_server","communities","geolocation"];
+  var validations = d.validations || {};
+
+  checkOrder.forEach(function(key) {
+    var v = validations[key];
+    if (!v) return;
+    var info = checkLabels[key] || { label: key, desc: "" };
+    var icon = v.status === "pass" ? "\u2705" : v.status === "warning" ? "\u26A0\uFE0F" : v.status === "fail" ? "\u274C" : "\u2753";
+    var clr = v.status === "pass" ? "var(--green)" : v.status === "warning" ? "var(--orange)" : v.status === "fail" ? "var(--red)" : "var(--muted)";
+    var txt = v.status === "pass" ? "Pass" : v.status === "warning" ? "Warn" : v.status === "fail" ? "Fail" : "Err";
+    var tt = buildHealthTooltip(key, v, info);
+    h += '<div class="health-check-item">';
+    h += '<span class="health-check-icon">' + icon + '</span>';
+    h += '<span class="health-check-name">' + info.label + '</span>';
+    h += '<span class="health-check-score" style="color:' + clr + '">' + txt + '</span>';
+    h += '<div class="health-tooltip">' + tt + '</div>';
+    h += '</div>';
+  });
+
+  h += '</div></div></div>';
+
+  // Expandable details
+  h += '<div class="expand-toggle" onclick="toggleExpand(this)">Show detailed validation results</div>';
+  h += '<div class="expand-body">';
+
+  checkOrder.forEach(function(key) {
+    var v = validations[key];
+    if (!v) return;
+    var info = checkLabels[key] || { label: key, desc: "" };
+    var icon = v.status === "pass" ? "\u2705" : v.status === "warning" ? "\u26A0\uFE0F" : v.status === "fail" ? "\u274C" : "\u2753";
+    var bc = v.status === "pass" ? "var(--green)" : v.status === "warning" ? "var(--orange)" : v.status === "fail" ? "var(--red)" : "var(--border)";
+
+    h += '<div style="padding:.75rem;margin-bottom:.5rem;background:var(--bg);border:1px solid var(--border);border-left:3px solid ' + bc + ';border-radius:8px">';
+    h += '<div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.4rem"><span>' + icon + '</span><strong style="font-size:.85rem">' + info.label + '</strong><span style="font-size:.7rem;color:var(--muted);margin-left:auto">' + info.desc + '</span></div>';
+    h += '<div style="font-size:.8rem;color:var(--text-dim)">';
+
+    if (key === "bogon") {
+      h += 'Prefixes checked: ' + (v.total_prefixes_checked || 0);
+      if (v.bogon_prefixes && v.bogon_prefixes.length > 0) {
+        h += '<div style="color:var(--red);margin-top:.3rem">Bogon prefixes:</div>';
+        v.bogon_prefixes.forEach(function(b) { h += '<div style="font-family:monospace;font-size:.75rem;margin-left:1rem">' + escHtml(b.prefix) + ' - ' + escHtml(b.reason) + '</div>'; });
+      } else { h += '<div style="color:var(--green)">No bogon prefixes</div>'; }
+      if (v.bogon_asns_in_paths && v.bogon_asns_in_paths.length > 0) { h += '<div style="color:var(--red)">Bogon ASNs: ' + v.bogon_asns_in_paths.join(', ') + '</div>'; }
+    } else if (key === "irr") {
+      h += 'IRR entries: ' + (v.total_entries || 0) + ', Mismatches: ' + (v.mismatch_count || 0);
+      if (v.mismatches && v.mismatches.length > 0) { v.mismatches.slice(0,5).forEach(function(m) { h += '<div style="font-family:monospace;font-size:.75rem;margin:.2rem 0">' + escHtml(m.prefix) + '</div>'; }); }
+    } else if (key === "rpki_completeness") {
+      var cc = (v.coverage_pct||0) >= 90 ? 'var(--green)' : 'var(--orange)';
+      h += 'Coverage: <strong style="color:' + cc + '">' + (v.coverage_pct||0) + '%</strong> (' + (v.with_roa||0) + '/' + (v.total_checked||0) + ')';
+      if (v.over_specific && v.over_specific.length > 0) { h += '<div style="color:var(--orange)">Over-specific (/25+): ' + v.over_specific.join(', ') + '</div>'; }
+    } else if (key === "abuse_contact") {
+      h += 'Contacts: ' + (v.contacts ? v.contacts.join(', ') : 'none');
+      h += '<br>Valid email: ' + (v.has_valid_email ? '<span style="color:var(--green)">Yes</span>' : '<span style="color:var(--red)">No</span>');
+    } else if (key === "blocklist") {
+      h += 'Checked: ' + (v.checked || 0);
+      if (v.listed_prefixes && v.listed_prefixes.length > 0) { h += '<div style="color:var(--red)">Listed:</div>'; v.listed_prefixes.forEach(function(lp) { h += '<div style="font-family:monospace;font-size:.75rem;margin-left:1rem">' + escHtml(lp.prefix) + ' on: ' + (lp.sources||[]).join(', ') + '</div>'; }); }
+      else { h += '<div style="color:var(--green)">No blocklist entries</div>'; }
+    } else if (key === "manrs") {
+      h += 'Participant: ' + (v.participant ? '<span style="color:var(--green)">Yes</span>' : '<span style="color:var(--orange)">No</span>');
+      if (v.score !== undefined) { h += ', Score: ' + v.score; }
+    } else if (key === "rdns") {
+      h += 'Coverage: ' + (v.coverage_pct || 0) + '% (' + (v.checked || 0) + ' checked)';
+    } else if (key === "visibility") {
+      h += 'Score: ' + (v.visibility_score || 0) + '%, Seen by ' + (v.seen_by || 0) + '/' + (v.total_rrcs || 0) + ' RRCs, Origin changes: ' + (v.origin_changes || 0);
+    } else if (key === "communities") {
+      h += 'Updates: ' + (v.total_updates || 0) + ', Unique communities: ' + (v.unique_communities || 0);
+      if (v.well_known_detected && v.well_known_detected.length > 0) { h += '<br>Well-known: '; v.well_known_detected.forEach(function(c) { h += '<span class="badge badge-orange">' + escHtml(c.community) + ' (' + c.well_known + ')</span> '; }); }
+    } else if (key === "geolocation") {
+      h += 'Geo countries: ' + (v.geo_countries || []).join(', ');
+      if (v.pdb_facility_countries && v.pdb_facility_countries.length > 0) { h += '<br>PDB countries: ' + v.pdb_facility_countries.join(', '); }
+      if (v.country_mismatches && v.country_mismatches.length > 0) { h += '<br><span style="color:var(--orange)">Mismatches: ' + v.country_mismatches.join(', ') + '</span>'; }
+    } else if (key === "rpsl") {
+      h += 'aut-num: ' + (v.exists ? '<span style="color:var(--green)">Exists</span>' : '<span style="color:var(--red)">Missing</span>');
+      if (v.exists) { h += ', Import: ' + (v.has_import ? 'Yes' : 'No') + ', Export: ' + (v.has_export ? 'Yes' : 'No'); }
+    } else if (key === "ix_route_server") {
+      h += 'IX connections: ' + (v.total_ix_connections || 0) + ', RS peers: ' + (v.rs_peer_count || 0) + ' (' + (v.rs_peer_pct || 0) + '%)';
+      if (v.message) { h += '<br><span style="color:var(--muted)">' + escHtml(v.message) + '</span>'; }
+    } else if (key === "resource_cert") {
+      h += 'ROAs: ' + (v.has_roas ? '<span style="color:var(--green)">Yes</span>' : '<span style="color:var(--red)">No RPKI CA</span>') + ' (' + (v.roa_count || 0) + '/' + (v.checked || 0) + ')';
+    } else {
+      h += escHtml(JSON.stringify(v).substring(0, 200));
+    }
+
+    h += '</div></div>';
+  });
+
+  h += '</div>';
+  h += '<div style="font-size:.7rem;color:var(--dim);margin-top:.75rem">Validation completed in ' + (d.meta ? d.meta.duration_ms : '?') + 'ms | ' + (d.meta ? d.meta.total_prefixes : '?') + ' prefixes, ' + (d.meta ? d.meta.prefixes_sampled : '?') + ' sampled</div>';
+  $('healthContent').innerHTML = h;
+}
+
+
+function loadPeeringRecommendations(asn, ixConnections) {
+  if (!ixConnections || ixConnections.length === 0) return;
+  $('peeringRecCard').classList.remove('hidden');
+
+  // Get the IXPs this network is on
+  var myIxIds = new Set(ixConnections.map(function(ix) { return ix.ix_id; }));
+  var myIxNames = {};
+  ixConnections.forEach(function(ix) { myIxNames[ix.ix_id] = ix.ix_name; });
+
+  // Top networks to check peering potential with
+  var topNets = [13335, 15169, 32934, 16509, 8075, 20940, 6939, 174, 1299, 2914, 3356, 3257, 714, 36459, 13414, 46489, 14618, 54113, 396982, 2906];
+
+  $('peeringRecContent').innerHTML = '<div style="color:var(--dim);font-size:.85rem">Checking peering potential with top 20 networks...</div>';
+
+  // Fetch IX presence for top networks
+  Promise.all(topNets.map(function(targetAsn) {
+    return fetch('/api/lookup?asn=' + targetAsn).then(function(r) { return r.json(); }).then(function(d) {
+      var name = d.network ? d.network.name : 'AS' + targetAsn;
+      var theirIx = (d.ix_presence && d.ix_presence.connections) || [];
+      var theirIxIds = new Set(theirIx.map(function(ix) { return ix.ix_id; }));
+      var common = [];
+      myIxIds.forEach(function(id) { if (theirIxIds.has(id)) common.push(myIxNames[id] || 'IX-' + id); });
+      return { asn: targetAsn, name: name, common_ixps: common, their_total: theirIx.length };
+    }).catch(function() { return null; });
+  })).then(function(results) {
+    results = results.filter(function(r) { return r && r.asn !== parseInt(asn); });
+    // Sort by common IXPs descending
+    results.sort(function(a, b) { return b.common_ixps.length - a.common_ixps.length; });
+
+    var h = '';
+    var withCommon = results.filter(function(r) { return r.common_ixps.length > 0; });
+    var without = results.filter(function(r) { return r.common_ixps.length === 0; });
+
+    if (withCommon.length > 0) {
+      h += '<div style="font-size:.7rem;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.5rem">\u2705 Peering possible at shared IXPs (' + withCommon.length + ')</div>';
+      h += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:.5rem;margin-bottom:1rem">';
+      withCommon.forEach(function(r) {
+        h += '<div onclick="lookupAsn(' + r.asn + ')" style="cursor:pointer;background:var(--bg);border:1px solid rgba(156,206,106,.2);border-radius:10px;padding:.65rem .85rem;transition:all .15s" onmouseenter="this.style.borderColor=\'var(--green)\'" onmouseleave="this.style.borderColor=\'rgba(156,206,106,.2)\'">';
+        h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.3rem"><span style="font-weight:700;font-size:.85rem;color:var(--green)">AS' + r.asn + '</span><span style="font-size:.65rem;color:var(--muted)">' + r.common_ixps.length + ' shared IXPs</span></div>';
+        h += '<div style="font-size:.75rem;color:var(--text-dim);margin-bottom:.3rem">' + escHtml(r.name) + '</div>';
+        h += '<div style="display:flex;flex-wrap:wrap;gap:.25rem">';
+        r.common_ixps.slice(0, 5).forEach(function(ix) {
+          h += '<span style="font-size:.6rem;padding:.1rem .35rem;border-radius:4px;background:rgba(156,206,106,.1);color:var(--green);border:1px solid rgba(156,206,106,.15)">' + escHtml(ix) + '</span>';
+        });
+        if (r.common_ixps.length > 5) h += '<span style="font-size:.6rem;color:var(--muted)">+' + (r.common_ixps.length - 5) + ' more</span>';
+        h += '</div></div>';
+      });
+      h += '</div>';
+    }
+
+    if (without.length > 0) {
+      h += '<div style="font-size:.7rem;font-weight:700;color:var(--orange);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.5rem">\u26a0\ufe0f No shared IXP (' + without.length + ')</div>';
+      h += '<div style="display:flex;flex-wrap:wrap;gap:.4rem">';
+      without.forEach(function(r) {
+        h += '<span onclick="lookupAsn(' + r.asn + ')" style="cursor:pointer;font-size:.7rem;padding:.25rem .5rem;border-radius:6px;background:rgba(255,158,100,.08);border:1px solid rgba(255,158,100,.15);color:var(--orange)">' + escHtml(r.name) + ' (AS' + r.asn + ')</span>';
+      });
+      h += '</div>';
+    }
+
+    h += '<div style="font-size:.65rem;color:var(--dim);margin-top:.75rem;text-align:center">Compared with top 20 global networks by traffic volume</div>';
+    $('peeringRecContent').innerHTML = h;
+  });
+}
+
 </script>
 </body>
 </html>

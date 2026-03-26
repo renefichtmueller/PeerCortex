@@ -23,7 +23,10 @@ try {
 const BGPROUTES_API_KEY = process.env.BGPROUTES_API_KEY || "";
 const BGPROUTES_API_URL = process.env.BGPROUTES_API_URL || "https://api.bgproutes.io/v1";
 
-const UA = "PeerCortex/0.4.0 (https://github.com/renefichtmueller/PeerCortex)";
+const PEERINGDB_API_KEY = process.env.PEERINGDB_API_KEY || "";
+const PEERINGDB_API_URL = process.env.PEERINGDB_API_URL || "https://www.peeringdb.com/api";
+
+const UA = "PeerCortex/0.5.0 (+https://peercortex.org; contact: rene.fichtmueller@flexoptix.net)";
 
 // ============================================================
 // Task 6: In-memory cache with TTL + Rate Limiting
@@ -56,6 +59,226 @@ const CACHE_TTL_ASPA = 10 * 60 * 1000;    // 10 minutes
 const CACHE_TTL_NEWS = 10 * 60 * 1000;    // 10 minutes
 const CACHE_TTL_DEFAULT = 5 * 60 * 1000;  // 5 minutes
 
+// ============================================================
+// RPKI ASPA + ROA Cache from Cloudflare RPKI JSON feed
+// ============================================================
+const rpkiAspaMap = new Map(); // customer_asid -> Set<provider_asn>
+// Indexed ROA storage: Map<firstOctet, Array<{ip, prefixLen, maxLength, asn}>>
+// IPv4 keyed by first octet (0-255), IPv6 keyed by "v6:" + first 16 bits hex
+const rpkiRoaIndex = new Map();
+let rpkiRoaCount = 0;
+let rpkiAspaLastFetch = 0;
+let rpkiAspaFetching = false;
+
+// Parse an IPv4 address string to a 32-bit unsigned integer
+function ipv4ToInt(addr) {
+  const parts = addr.split(".").map(Number);
+  return ((parts[0] << 24) | (parts[1] << 16) | (parts[2] << 8) | parts[3]) >>> 0;
+}
+
+// Add a ROA to the indexed structure
+function addRoaToIndex(prefix, maxLength, asn) {
+  const isV6 = prefix.includes(":");
+  const pfxParts = prefix.split("/");
+  const prefixLen = parseInt(pfxParts[1] || (isV6 ? "128" : "32"));
+
+  if (isV6) {
+    // Index by first 16 bits (first hex group)
+    const firstGroup = pfxParts[0].split(":")[0] || "0";
+    const key = "v6:" + firstGroup.toLowerCase();
+    const entry = { prefixStr: pfxParts[0], prefixLen, maxLength, asn };
+    if (!rpkiRoaIndex.has(key)) rpkiRoaIndex.set(key, []);
+    rpkiRoaIndex.get(key).push(entry);
+  } else {
+    // Index by first octet
+    const firstOctet = parseInt(pfxParts[0].split(".")[0]) || 0;
+    const entry = { ip: ipv4ToInt(pfxParts[0]), prefixLen, maxLength, asn };
+    if (!rpkiRoaIndex.has(firstOctet)) rpkiRoaIndex.set(firstOctet, []);
+    rpkiRoaIndex.get(firstOctet).push(entry);
+  }
+}
+
+// Validate a single prefix against the indexed ROA data (all 5 RIRs) - O(bucket) not O(n)
+function validateRPKILocal(asn, prefix) {
+  const asnNum = Number(asn);
+  const isV6 = prefix.includes(":");
+  const parts = prefix.split("/");
+  const addr = parts[0];
+  const prefixLen = parseInt(parts[1] || (isV6 ? "128" : "32"));
+
+  let matchingRoas = 0;
+  let validRoas = 0;
+
+  if (isV6) {
+    const firstGroup = addr.split(":")[0] || "0";
+    const key = "v6:" + firstGroup.toLowerCase();
+    const bucket = rpkiRoaIndex.get(key);
+    if (!bucket) return { prefix, status: "not_found", validating_roas: 0 };
+
+    // Parse query IPv6 address (simplified: expand :: then compute)
+    let qParts = addr.split(":");
+    const dblIdx = qParts.indexOf("");
+    if (dblIdx !== -1) {
+      const head = qParts.slice(0, dblIdx);
+      const tail = qParts.slice(dblIdx + 1).filter(Boolean);
+      const fill = new Array(8 - head.length - tail.length).fill("0");
+      qParts = head.concat(fill, tail);
+    }
+    let qBig = BigInt(0);
+    for (let i = 0; i < 8; i++) qBig = (qBig << BigInt(16)) | BigInt(parseInt(qParts[i] || "0", 16));
+
+    for (let i = 0; i < bucket.length; i++) {
+      const roa = bucket[i];
+      if (prefixLen < roa.prefixLen) continue;
+      if (prefixLen > roa.maxLength) continue;
+      // Check coverage: parse ROA address
+      let rParts = roa.prefixStr.split(":");
+      const rDbl = rParts.indexOf("");
+      if (rDbl !== -1) {
+        const rHead = rParts.slice(0, rDbl);
+        const rTail = rParts.slice(rDbl + 1).filter(Boolean);
+        const rFill = new Array(8 - rHead.length - rTail.length).fill("0");
+        rParts = rHead.concat(rFill, rTail);
+      }
+      let rBig = BigInt(0);
+      for (let j = 0; j < 8; j++) rBig = (rBig << BigInt(16)) | BigInt(parseInt(rParts[j] || "0", 16));
+      const shift = BigInt(128 - roa.prefixLen);
+      if ((rBig >> shift) === (qBig >> shift)) {
+        matchingRoas++;
+        if (roa.asn === asnNum) validRoas++;
+      }
+    }
+  } else {
+    const firstOctet = parseInt(addr.split(".")[0]) || 0;
+    const bucket = rpkiRoaIndex.get(firstOctet);
+    if (!bucket) return { prefix, status: "not_found", validating_roas: 0 };
+
+    const qIp = ipv4ToInt(addr);
+    for (let i = 0; i < bucket.length; i++) {
+      const roa = bucket[i];
+      if (prefixLen < roa.prefixLen) continue;
+      if (prefixLen > roa.maxLength) continue;
+      const mask = roa.prefixLen === 0 ? 0 : (~((1 << (32 - roa.prefixLen)) - 1)) >>> 0;
+      if ((roa.ip & mask) === (qIp & mask)) {
+        matchingRoas++;
+        if (roa.asn === asnNum) validRoas++;
+      }
+    }
+  }
+
+  if (matchingRoas === 0) return { prefix, status: "not_found", validating_roas: 0 };
+  if (validRoas > 0) return { prefix, status: "valid", validating_roas: validRoas };
+  return { prefix, status: "invalid", validating_roas: 0 };
+}
+
+function fetchRpkiAspaFeed() {
+  if (rpkiAspaFetching) return Promise.resolve();
+  rpkiAspaFetching = true;
+  console.log("[RPKI] Fetching Cloudflare RPKI feed (ASPA + ROA)...");
+  return new Promise((resolve) => {
+    const options = {
+      headers: { "User-Agent": UA },
+      timeout: 60000,
+    };
+    https.get("https://rpki.cloudflare.com/rpki.json", options, (res) => {
+      let data = "";
+      res.on("data", (chunk) => (data += chunk));
+      res.on("end", () => {
+        try {
+          const parsed = JSON.parse(data);
+
+          // Load ASPA objects
+          const aspas = parsed.aspas || [];
+          rpkiAspaMap.clear();
+          aspas.forEach((a) => {
+            const customerAsid = Number(a.customer_asid);
+            const providers = (a.providers || []).map(Number);
+            rpkiAspaMap.set(customerAsid, new Set(providers));
+          });
+
+          // Load ROA objects into indexed structure for fast local RPKI validation (all 5 RIRs)
+          const roas = parsed.roas || [];
+          rpkiRoaIndex.clear();
+          rpkiRoaCount = 0;
+          roas.forEach((r) => {
+            const pfx = r.prefix;
+            if (!pfx) return;
+            const maxLen = r.maxLength || parseInt((pfx).split("/")[1] || "0");
+            const originAsn = Number(String(r.asn).replace(/^AS/i, ""));
+            addRoaToIndex(pfx, maxLen, originAsn);
+            rpkiRoaCount++;
+          });
+
+          rpkiAspaLastFetch = Date.now();
+          console.log("[RPKI] Loaded " + rpkiAspaMap.size + " ASPA objects + " + rpkiRoaCount + " ROAs (" + rpkiRoaIndex.size + " index buckets) from Cloudflare RPKI feed");
+        } catch (e) {
+          console.error("[RPKI] Failed to parse RPKI feed:", e.message);
+        }
+        rpkiAspaFetching = false;
+        resolve();
+      });
+    }).on("error", (e) => {
+      console.error("[RPKI] Fetch failed:", e.message);
+      rpkiAspaFetching = false;
+      resolve();
+    });
+  });
+}
+
+// Ensure ASPA cache is fresh (fetch if older than 10 minutes)
+async function ensureAspaCache() {
+  if (Date.now() - rpkiAspaLastFetch > 10 * 60 * 1000) {
+    await fetchRpkiAspaFeed();
+  }
+}
+
+// Lookup ASPA object for a given ASN from the RPKI feed cache
+function lookupAspaFromRpki(asn) {
+  const asnNum = Number(asn);
+  if (rpkiAspaMap.has(asnNum)) {
+    const providers = rpkiAspaMap.get(asnNum);
+    return { exists: true, providers: [...providers].sort((a, b) => a - b) };
+  }
+  return { exists: false, providers: [] };
+}
+
+
+
+// PeeringDB authenticated fetch helper
+function fetchPeeringDB(path, options) {
+  const url = PEERINGDB_API_URL + path;
+  const headers = { "User-Agent": UA };
+  if (PEERINGDB_API_KEY) {
+    headers["Authorization"] = "Api-Key " + PEERINGDB_API_KEY;
+  }
+  return fetchJSON(url, { ...options, headers: { ...(options && options.headers || {}), ...headers } });
+}
+
+// bgproutes.io visibility fallback helper
+// Queries the RIB endpoint to estimate prefix visibility across vantage points
+function fetchBgproutesVisibility(prefix) {
+  if (!BGPROUTES_API_KEY) return Promise.resolve(null);
+  const url = BGPROUTES_API_URL + "/rib?prefix=" + encodeURIComponent(prefix) + "&prefix_match=exact";
+  return fetchJSON(url, {
+    timeout: 15000,
+    headers: {
+      "Authorization": "Bearer " + BGPROUTES_API_KEY,
+      "User-Agent": UA,
+    },
+  }).then(function(data) {
+    if (!data || !data.data) return null;
+    // data.data should be an array of RIB entries from different vantage points
+    var entries = Array.isArray(data.data) ? data.data : (data.data.entries || data.data.routes || []);
+    var vpSet = new Set();
+    entries.forEach(function(e) {
+      if (e.vantage_point || e.vp || e.collector || e.peer_asn) {
+        vpSet.add(e.vantage_point || e.vp || e.collector || e.peer_asn);
+      }
+    });
+    return { vps_seeing: vpSet.size, total_entries: entries.length, source: "bgproutes.io" };
+  }).catch(function() { return null; });
+}
+
 // Rate limiting: max 60 requests per minute per IP
 const rateLimitMap = new Map();
 const RATE_LIMIT_WINDOW = 60 * 1000;
@@ -79,7 +302,7 @@ function checkRateLimit(ip) {
 }
 
 function fetchJSON(url, options) {
-  const timeoutMs = (options && options.timeout) || 8000;
+  const timeoutMs = (options && options.timeout) || 20000;
   return new Promise((resolve) => {
     const reqOptions = {
       headers: { "User-Agent": UA, ...(options && options.headers ? options.headers : {}) },
@@ -485,7 +708,9 @@ async function fetchWhois(resource) {
     if (/^(AS)?\d+$/i.test(trimmed)) {
       result.type = "aut-num";
       const asn = trimmed.replace(/^AS/i, "");
-      const ripeData = await fetchJSON("https://rest.db.ripe.net/search.json?query-string=AS" + asn + "&type-filter=aut-num&source=ripe");
+
+      // Try RIPE first
+      const ripeData = await fetchJSON("https://rest.db.ripe.net/search.json?query-string=AS" + asn + "&type-filter=aut-num&source=ripe", { timeout: 5000 }).catch(() => null);
       if (ripeData && ripeData.objects && ripeData.objects.object) {
         const obj = ripeData.objects.object[0];
         const attrs = obj.attributes?.attribute || [];
@@ -507,7 +732,52 @@ async function fetchWhois(resource) {
           export: parsed["export"] || [],
           remarks: parsed["remarks"] || [],
         };
-      } else { result.error = "Not found in RIPE DB"; }
+      }
+
+      // If RIPE didn't find it, try all other RIRs via RDAP in parallel
+      if (!result.data) {
+        const rdapEndpoints = [
+          { name: "APNIC", url: "https://rdap.apnic.net/autnum/" + asn },
+          { name: "ARIN", url: "https://rdap.arin.net/registry/autnum/" + asn },
+          { name: "LACNIC", url: "https://rdap.lacnic.net/rdap/autnum/" + asn },
+          { name: "AFRINIC", url: "https://rdap.afrinic.net/rdap/autnum/" + asn },
+        ];
+        const rdapResults = await Promise.all(rdapEndpoints.map((ep) =>
+          fetchJSON(ep.url, { timeout: 5000 }).then((d) => {
+            if (!d || d.errorCode || !d.handle) return null;
+            return { source: ep.name, data: d };
+          }).catch(() => null)
+        ));
+        const found = rdapResults.find((r) => r !== null);
+        if (found) {
+          const d = found.data;
+          const remarks = (d.remarks || []).map((r) => (r.description || []).join(" "));
+          const entities = d.entities || [];
+          const adminContacts = entities.filter((e) => (e.roles || []).includes("administrative")).map((e) => e.handle || "");
+          const techContacts = entities.filter((e) => (e.roles || []).includes("technical")).map((e) => e.handle || "");
+          const events = d.events || [];
+          const created = (events.find((e) => e.eventAction === "registration") || {}).eventDate || "";
+          const lastMod = (events.find((e) => e.eventAction === "last changed") || {}).eventDate || "";
+          result.data = {
+            aut_num: "AS" + asn,
+            as_name: d.name || "",
+            descr: remarks,
+            org: (entities.find((e) => (e.roles || []).includes("registrant")) || {}).handle || "",
+            admin_c: adminContacts,
+            tech_c: techContacts,
+            mnt_by: [],
+            status: (d.status || []).join(", "),
+            created: created,
+            last_modified: lastMod,
+            source: found.source + " (RDAP)",
+            import: [],
+            export: [],
+            remarks: remarks,
+          };
+        } else {
+          result.error = "Not found in any RIR database (RIPE, APNIC, ARIN, LACNIC, AFRINIC)";
+        }
+      }
     } else if (/[\/:]/.test(trimmed) || /^\d+\.\d+\.\d+/.test(trimmed)) {
       result.type = "inetnum";
       const ripeData = await fetchJSON("https://rest.db.ripe.net/search.json?query-string=" + encodeURIComponent(trimmed) + "&type-filter=inetnum,inet6num");
@@ -594,6 +864,117 @@ const server = http.createServer(async (req, res) => {
     return res.end();
   }
 
+  // Lia's Atlas Paradise - Easter egg page
+  if (reqPath === "/lia" || reqPath === "/lia/") {
+    try {
+      const liaHtml = fs.readFileSync(__dirname + "/public/lia.html", "utf8");
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      return res.end(liaHtml);
+    } catch (_e) {
+      res.writeHead(500);
+      return res.end("lia.html not found");
+    }
+  }
+
+
+  // ============================================================
+  // Lia's Atlas Paradise: Atlas probe coverage endpoint
+  // ============================================================
+  if (reqPath === "/api/atlas/coverage") {
+    res.setHeader("Content-Type", "application/json");
+    if (!atlasProbeCache) {
+      res.writeHead(503);
+      return res.end(JSON.stringify({ error: "Atlas probe data is still loading. Please try again in a minute." }));
+    }
+    return res.end(JSON.stringify(atlasProbeCache, null, 2));
+  }
+
+  // ============================================================
+  // Lia's Paradise: File parsing endpoint (for binary uploads)
+  // ============================================================
+  if (reqPath === "/api/lia/parse-file" && req.method === "POST") {
+    res.setHeader("Content-Type", "application/json");
+    let body = "";
+    req.on("data", function(chunk) { body += chunk; });
+    req.on("end", function() {
+      try {
+        var parsed = JSON.parse(body);
+        var filename = parsed.filename || "";
+        var ext = filename.split(".").pop().toLowerCase();
+        // For text-based formats, decode base64 and extract text
+        if (ext === "csv" || ext === "txt") {
+          var text = Buffer.from(parsed.data, "base64").toString("utf8");
+          return res.end(JSON.stringify({ text: text }));
+        }
+        // For binary formats (PDF, XLS, DOC), we can't parse server-side without
+        // heavy dependencies. Return helpful error.
+        return res.end(JSON.stringify({
+          error: "Binary file parsing (" + ext.toUpperCase() + ") requires client-side extraction. Please use CSV or TXT format, or copy-paste the content.",
+          suggestion: "Export your spreadsheet as CSV first, then upload the CSV file."
+        }));
+      } catch(e) {
+        return res.end(JSON.stringify({ error: "Parse error: " + e.message }));
+      }
+    });
+    return;
+  }
+
+  // ============================================================
+  // Lia's Paradise: Combined PeeringDB + Atlas coverage data
+  // ============================================================
+  if (reqPath === "/api/lia/coverage") {
+    res.setHeader("Content-Type", "application/json");
+    if (!atlasProbeCache) {
+      res.writeHead(503);
+      return res.end(JSON.stringify({ error: "Atlas probe data is still loading. Please try again in a minute." }));
+    }
+
+    // Cache this expensive response for 30 min
+    var liaCacheKey = "lia_coverage";
+    var liaCached = cacheGet(liaCacheKey);
+    if (liaCached) return res.end(liaCached);
+
+    // Fetch PeeringDB network list (all networks with status "ok")
+    // Use pre-cached org→country map (loaded at startup, 16MB response cached in memory)
+    fetchPeeringDB("/net?status=ok&depth=0").then(function(pdbData) {
+      if (!pdbData || !pdbData.data) {
+        return res.end(JSON.stringify({ error: "Could not fetch PeeringDB networks" }));
+      }
+
+      var probeAsns = new Set(atlasProbeCache.asns_with_probes || []);
+
+      var enriched = pdbData.data.map(function(n) {
+        var org = pdbOrgCountryMap.get(n.org_id) || {};
+        var cc = org.country || "";
+        return {
+          asn: n.asn,
+          name: n.name || "",
+          org_name: org.name || "",
+          country: cc,
+          country_name: cc,
+          info_type: n.info_type || "",
+          has_probe: probeAsns.has(n.asn),
+        };
+      }).filter(function(n) { return n.asn > 0 && n.country; });
+
+      var result = JSON.stringify({
+        networks: enriched,
+        total: enriched.length,
+        with_probes: enriched.filter(function(n) { return n.has_probe; }).length,
+        without_probes: enriched.filter(function(n) { return !n.has_probe; }).length,
+        atlas_unique_asns: probeAsns.size,
+        org_countries_loaded: pdbOrgCountryMap.size,
+        fetched_at: new Date().toISOString(),
+      });
+
+      cacheSet(liaCacheKey, result, 30 * 60 * 1000);
+      res.end(result);
+    }).catch(function(e) {
+      res.end(JSON.stringify({ error: "PeeringDB fetch failed: " + e.message }));
+    });
+    return;
+  }
+
   res.setHeader("Content-Type", "application/json");
 
   // Health endpoint
@@ -602,7 +983,7 @@ const server = http.createServer(async (req, res) => {
       JSON.stringify({
         status: "ok",
         service: "PeerCortex",
-        version: "0.3.0",
+        version: "0.5.0",
         timestamp: new Date().toISOString(),
         uptime_seconds: Math.floor(process.uptime()),
         bgproutes_configured: !!BGPROUTES_API_KEY,
@@ -642,7 +1023,7 @@ const server = http.createServer(async (req, res) => {
 
       // Extract AS paths from looking glass results
       const allPaths = [];
-      const upstreamSet = new Set();
+      const pathNeighbourCount = new Map(); // Count how often each AS appears next to target in paths
 
       lgResults.forEach((lgData) => {
         const rrcs = lgData?.data?.rrcs || [];
@@ -661,16 +1042,19 @@ const server = http.createServer(async (req, res) => {
               });
               const idx = pathArr.indexOf(targetAsn);
               if (idx > 0) {
-                upstreamSet.add(pathArr[idx - 1]);
+                const neighbour = pathArr[idx - 1];
+                pathNeighbourCount.set(neighbour, (pathNeighbourCount.get(neighbour) || 0) + 1);
               }
             }
           });
         });
       });
 
-      // Get neighbours for provider relationships
+      // Provider detection: ONLY use RIPE Stat "left" neighbours (verified upstreams)
+      // AS-path analysis is used for frequency/confirmation, NOT as standalone provider source
       const neighbours = neighbourData?.data?.neighbours || [];
       const leftNeighbours = neighbours.filter((n) => n.type === "left");
+      const upstreamSet = new Set();
       leftNeighbours.forEach((n) => upstreamSet.add(n.asn));
 
       const detectedProviders = [...upstreamSet].map((asn) => {
@@ -690,36 +1074,29 @@ const server = http.createServer(async (req, res) => {
         }
       });
 
-      // Check RIPE DB for ASPA object
-      let aspaObjectExists = false;
-      let aspaDeclaredProviders = [];
-      try {
-        const ripeDbInfo = await fetchJSON(
-          "https://rest.db.ripe.net/search.json?query-string=AS" +
-            rawAsn +
-            "&type-filter=aut-num&source=ripe"
-        );
-        const objects = ripeDbInfo?.objects?.object || [];
-        objects.forEach((obj) => {
-          const attrs = obj.attributes?.attribute || [];
-          attrs.forEach((attr) => {
-            if (attr.name === "remarks" && attr.value && attr.value.toLowerCase().includes("aspa")) {
-              aspaObjectExists = true;
-            }
-            if (attr.name === "import" || attr.name === "mp-import") {
-              const match = (attr.value || "").match(/from\s+AS(\d+)/i);
-              if (match) {
-                aspaDeclaredProviders.push(parseInt(match[1]));
-              }
-            }
-          });
-        });
-      } catch (_e) {
-        // RIPE DB query failed
-      }
+      // Check Cloudflare RPKI feed for ASPA object
+      await ensureAspaCache();
+      const aspaLookup = lookupAspaFromRpki(targetAsn);
+      const aspaObjectExists = aspaLookup.exists;
+      const aspaDeclaredProviders = aspaLookup.providers;
 
-      // Build ASPA store and run verification
-      const aspaStore = buildAspaStore(detectedProviders, targetAsn);
+      // Build ASPA store from RPKI feed data (real ASPA objects)
+      const aspaStore = new Map();
+      // Add the target ASN's RPKI-declared providers
+      if (aspaObjectExists) {
+        aspaStore.set(targetAsn, new Set(aspaDeclaredProviders));
+      } else {
+        // Fallback: use detected providers for path verification
+        const providerSet = new Set(detectedProviders.map((p) => p.asn));
+        aspaStore.set(targetAsn, providerSet);
+      }
+      // Also populate store with all known ASPA objects from the RPKI feed
+      // for providers that have their own ASPA objects (enables full path verification)
+      for (const [cas, provSet] of rpkiAspaMap) {
+        if (!aspaStore.has(cas)) {
+          aspaStore.set(cas, provSet);
+        }
+      }
 
       // Also add reverse relationships for providers we know about
       // (each provider has the target as customer)
@@ -802,8 +1179,10 @@ const server = http.createServer(async (req, res) => {
         : aspaObjectExists ? 100 : 0;
 
       // Get RPKI coverage for readiness score
-      const rpkiBatch = announcedPrefixes.slice(0, 20).map((p) => p.prefix);
-      const rpkiResults = await Promise.all(rpkiBatch.map((pfx) => fetchRPKIPerPrefix(rawAsn, pfx)));
+      // Validate ALL prefixes using local RPKI data (Cloudflare feed - all 5 RIRs)
+      await ensureAspaCache();
+      const rpkiBatch = announcedPrefixes.map((p) => p.prefix);
+      const rpkiResults = rpkiBatch.map((pfx) => validateRPKILocal(rawAsn, pfx));
       const rpkiValid = rpkiResults.filter((r) => r.status === "valid").length;
       const rpkiCoverage = rpkiResults.length > 0 ? Math.round((rpkiValid / rpkiResults.length) * 100) : 0;
 
@@ -885,7 +1264,6 @@ const server = http.createServer(async (req, res) => {
 
       const rrcs = lgData?.data?.rrcs || [];
       const asPaths = [];
-      const upstreamSet = new Set();
 
       rrcs.forEach((rrc) => {
         const peers = rrc.peers || [];
@@ -894,16 +1272,14 @@ const server = http.createServer(async (req, res) => {
           const pathArr = path.split(" ").map(Number).filter(Boolean);
           if (pathArr.length > 1) {
             asPaths.push({ rrc: rrc.rrc, path: pathArr, prefix: peer.prefix || "" });
-            const idx = pathArr.indexOf(parseInt(rawAsn));
-            if (idx > 0) {
-              upstreamSet.add(pathArr[idx - 1]);
-            }
           }
         });
       });
 
+      // Provider detection: ONLY use RIPE Stat "left" neighbours (verified upstreams)
       const neighbours = neighbourData?.data?.neighbours || [];
       const leftNeighbours = neighbours.filter((n) => n.type === "left");
+      const upstreamSet = new Set();
       leftNeighbours.forEach((n) => upstreamSet.add(n.asn));
 
       const detectedProviders = [...upstreamSet].map((asn) => {
@@ -913,26 +1289,14 @@ const server = http.createServer(async (req, res) => {
 
       await resolveASNames(detectedProviders);
 
-      let aspaObjectExists = false;
-      try {
-        const ripeDbInfo = await fetchJSON(
-          "https://rest.db.ripe.net/search.json?query-string=AS" +
-            rawAsn +
-            "&type-filter=aut-num&source=ripe"
-        );
-        const objects = ripeDbInfo?.objects?.object || [];
-        objects.forEach((obj) => {
-          const attrs = obj.attributes?.attribute || [];
-          attrs.forEach((attr) => {
-            if (attr.name === "remarks" && attr.value && attr.value.toLowerCase().includes("aspa")) {
-              aspaObjectExists = true;
-            }
-          });
-        });
-      } catch (_e) {}
+      // Check Cloudflare RPKI feed for ASPA object
+      await ensureAspaCache();
+      const aspaLookup = lookupAspaFromRpki(rawAsn);
+      const aspaObjectExists = aspaLookup.exists;
+      const aspaDeclaredProviders = aspaLookup.providers;
 
       const providerList = detectedProviders.map((p) => "AS" + p.asn).join(", ");
-      const recommendedAspa =
+      let recommendedAspa =
         "aut-num:        AS" + rawAsn + "\n" +
         "# Recommended ASPA object:\n" +
         "# customer:     AS" + rawAsn + "\n" +
@@ -941,6 +1305,12 @@ const server = http.createServer(async (req, res) => {
         "#\n" +
         "# Detected providers from BGP path analysis:\n" +
         detectedProviders.map((p) => "#   AS" + p.asn + (p.name ? " (" + p.name + ")" : "")).join("\n");
+
+      // If ASPA object exists, show RPKI-declared providers
+      if (aspaObjectExists && aspaDeclaredProviders.length > 0) {
+        recommendedAspa += "\n#\n# RPKI-declared providers (from Cloudflare RPKI feed):\n" +
+          aspaDeclaredProviders.map((a) => "#   AS" + a).join("\n");
+      }
 
       const samplePaths = asPaths.slice(0, 10).map((p) => {
         const pathStr = p.path.map((a) => "AS" + a).join(" -> ");
@@ -964,6 +1334,8 @@ const server = http.createServer(async (req, res) => {
             detected_providers: detectedProviders,
             provider_count: detectedProviders.length,
             aspa_object_exists: aspaObjectExists,
+            aspa_declared_providers: aspaDeclaredProviders.map((a) => ({ asn: a })),
+            aspa_declared_count: aspaDeclaredProviders.length,
             recommended_aspa: recommendedAspa,
             path_analysis: {
               total_paths_seen: asPaths.length,
@@ -1056,8 +1428,20 @@ const server = http.createServer(async (req, res) => {
               return {
                 prefix: pfx,
                 as_path: asPath,
-                rov_status: rovStatus.split(",").map((s) => s === "V" ? "valid" : s === "I" ? "invalid" : s === "U" ? "unknown" : s).join(","),
-                aspa_status: aspaStatus.split(",").map((s) => s === "V" ? "valid" : s === "I" ? "invalid" : s === "U" ? "unknown" : s).join(","),
+                rov_status: (function(rs) {
+                  var parts = rs.split(",").map(function(s) { return s === "V" ? "valid" : s === "I" ? "invalid" : s === "U" ? "unknown" : s; });
+                  if (parts.indexOf("invalid") >= 0) return "invalid";
+                  if (parts.indexOf("unknown") >= 0) return "unknown";
+                  if (parts.indexOf("valid") >= 0) return "valid";
+                  return parts[0] || "unknown";
+                })(rovStatus),
+                aspa_status: (function(as) {
+                  var parts = as.split(",").map(function(s) { return s === "V" ? "valid" : s === "I" ? "invalid" : s === "U" ? "unknown" : s; });
+                  if (parts.indexOf("invalid") >= 0) return "invalid";
+                  if (parts.indexOf("unknown") >= 0) return "unknown";
+                  if (parts.indexOf("valid") >= 0) return "valid";
+                  return parts[0] || "unknown";
+                })(aspaStatus),
               };
             });
 
@@ -1107,14 +1491,15 @@ const server = http.createServer(async (req, res) => {
     try {
       // Phase 1: Fetch core data needed by multiple validations
       const [prefixData, pdbNet, neighbourData, overviewData] = await Promise.all([
-        fetchJSON("https://stat.ripe.net/data/announced-prefixes/data.json?resource=AS" + rawAsn),
-        fetchJSON("https://www.peeringdb.com/api/net?asn=" + rawAsn),
-        fetchJSON("https://stat.ripe.net/data/asn-neighbours/data.json?resource=AS" + rawAsn),
+        fetchJSON("https://stat.ripe.net/data/announced-prefixes/data.json?resource=AS" + rawAsn, { timeout: 30000 }),
+        fetchPeeringDB("/net?asn=" + rawAsn),
+        fetchJSON("https://stat.ripe.net/data/asn-neighbours/data.json?resource=AS" + rawAsn, { timeout: 30000 }),
         fetchJSON("https://stat.ripe.net/data/as-overview/data.json?resource=AS" + rawAsn),
       ]);
 
       const allPrefixes = (prefixData && prefixData.data && prefixData.data.prefixes ? prefixData.data.prefixes : []).map(function(p) { return p.prefix; });
-      const samplePrefixes = allPrefixes.slice(0, 10);
+      // Use all prefixes for RPKI validation (local lookup is fast, no API calls)
+      const samplePrefixes = allPrefixes;
       const net = pdbNet && pdbNet.data && pdbNet.data[0] ? pdbNet.data[0] : {};
       const netId = net.id;
       const neighbours = neighbourData && neighbourData.data && neighbourData.data.neighbours ? neighbourData.data.neighbours : [];
@@ -1190,9 +1575,10 @@ const server = http.createServer(async (req, res) => {
         };
       }).catch(function(e) { return { status: "error", error: String(e) }; });
 
-      // 13. RPKI ROA Completeness
-      validationPromises.rpki_completeness = Promise.all(
-        samplePrefixes.map(function(pfx) { return fetchRPKIPerPrefix(rawAsn, pfx); })
+      // 13. RPKI ROA Completeness (local validation against Cloudflare RPKI feed - all RIRs)
+      await ensureAspaCache(); // Ensure ROA data is loaded
+      validationPromises.rpki_completeness = Promise.resolve(
+        allPrefixes.map(function(pfx) { return validateRPKILocal(rawAsn, pfx); })
       ).then(function(rpkiResults) {
         var withRoa = rpkiResults.filter(function(r) { return r.status === "valid"; });
         var coverage = rpkiResults.length > 0 ? Math.round((withRoa.length / rpkiResults.length) * 100) : 0;
@@ -1267,6 +1653,19 @@ const server = http.createServer(async (req, res) => {
         var seenBy = visibilities.filter(function(v) { return (v.rrcs_seeing || v.ipv4_full_table_peer_count || 0) > 0; }).length;
         var score = totalRrcs > 0 ? Math.round((seenBy / totalRrcs) * 100) : 0;
         var history = histData && histData.data && histData.data.by_origin ? histData.data.by_origin : [];
+        // If RIPE Stat returned no data, try bgproutes.io fallback
+        if (totalRrcs === 0 && samplePrefixes[0]) {
+          return fetchBgproutesVisibility(samplePrefixes[0]).then(function(bgprFb) {
+            if (bgprFb && bgprFb.vps_seeing > 0) {
+              seenBy = bgprFb.vps_seeing;
+              totalRrcs = Math.max(bgprFb.vps_seeing, 300);
+              score = Math.round((seenBy / totalRrcs) * 100);
+            }
+            return { status: score >= 80 ? "pass" : score >= 50 ? "warning" : "fail", visibility_score: score, total_rrcs: totalRrcs, seen_by: seenBy, origin_changes: history.length, sample_prefix: samplePrefixes[0] || null };
+          }).catch(function() {
+            return { status: score >= 80 ? "pass" : score >= 50 ? "warning" : "fail", visibility_score: score, total_rrcs: totalRrcs, seen_by: seenBy, origin_changes: history.length, sample_prefix: samplePrefixes[0] || null };
+          });
+        }
         return { status: score >= 80 ? "pass" : score >= 50 ? "warning" : "fail", visibility_score: score, total_rrcs: totalRrcs, seen_by: seenBy, origin_changes: history.length, sample_prefix: samplePrefixes[0] || null };
       }).catch(function(e) { return { status: "error", error: String(e) }; });
 
@@ -1308,31 +1707,80 @@ const server = http.createServer(async (req, res) => {
         return { status: Object.keys(countries).length > 0 ? "pass" : "warning", geo_countries: Object.keys(countries), sample_prefix: samplePrefixes[0] || null, located_resources: locatedPfxs.length };
       }).catch(function(e) { return { status: "error", error: String(e) }; });
 
-      // 21. RPSL/IRR Object Validation
-      validationPromises.rpsl = fetchJSON("https://rest.db.ripe.net/lookup/ripe/aut-num/AS" + rawAsn + ".json").then(function(data) {
-        var objects = data && data.objects && data.objects.object ? data.objects.object : [];
-        if (objects.length === 0) return { status: "warning", exists: false, has_policy: false };
-        var attrs = objects[0] && objects[0].attributes && objects[0].attributes.attribute ? objects[0].attributes.attribute : [];
-        var hasImport = attrs.some(function(a) { return a.name === "import" || a.name === "mp-import"; });
-        var hasExport = attrs.some(function(a) { return a.name === "export" || a.name === "mp-export"; });
-        var hasRemarks = attrs.some(function(a) { return a.name === "remarks"; });
-        return { status: (hasImport || hasExport) ? "pass" : "warning", exists: true, has_import: hasImport, has_export: hasExport, has_remarks: hasRemarks, has_policy: hasImport || hasExport };
-      }).catch(function(e) { return { status: "warning", exists: false, error: String(e) }; });
+      // 21. RPSL/IRR Object Validation (query all 5 RIRs in parallel)
+      validationPromises.rpsl = (function() {
+        // Try RIPE first (has richest policy data), then RDAP for other RIRs
+        var ripePromise = fetchJSON("https://rest.db.ripe.net/lookup/ripe/aut-num/AS" + rawAsn + ".json", { timeout: 5000 }).then(function(data) {
+          var objects = data && data.objects && data.objects.object ? data.objects.object : [];
+          if (objects.length === 0) return null;
+          var attrs = objects[0] && objects[0].attributes && objects[0].attributes.attribute ? objects[0].attributes.attribute : [];
+          var hasImport = attrs.some(function(a) { return a.name === "import" || a.name === "mp-import"; });
+          var hasExport = attrs.some(function(a) { return a.name === "export" || a.name === "mp-export"; });
+          var hasRemarks = attrs.some(function(a) { return a.name === "remarks"; });
+          return { status: (hasImport || hasExport) ? "pass" : "warning", exists: true, has_import: hasImport, has_export: hasExport, has_remarks: hasRemarks, has_policy: hasImport || hasExport, source: "RIPE" };
+        }).catch(function() { return null; });
 
-      // 22. IXP Route Server Participation
+        var rdapEndpoints = [
+          { name: "APNIC", url: "https://rdap.apnic.net/autnum/" + rawAsn },
+          { name: "ARIN", url: "https://rdap.arin.net/registry/autnum/" + rawAsn },
+          { name: "LACNIC", url: "https://rdap.lacnic.net/rdap/autnum/" + rawAsn },
+          { name: "AFRINIC", url: "https://rdap.afrinic.net/rdap/autnum/" + rawAsn },
+        ];
+        var rdapPromises = rdapEndpoints.map(function(ep) {
+          return fetchJSON(ep.url, { timeout: 5000 }).then(function(data) {
+            if (!data || data.errorCode || !data.handle) return null;
+            var hasRemarks = !!(data.remarks && data.remarks.length > 0);
+            var name = data.name || "";
+            return { status: hasRemarks ? "pass" : "warning", exists: true, has_import: false, has_export: false, has_remarks: hasRemarks, has_policy: false, source: ep.name, rdap_name: name, rdap_handle: data.handle || "" };
+          }).catch(function() { return null; });
+        });
+
+        return Promise.all([ripePromise].concat(rdapPromises)).then(function(results) {
+          // Take first successful result
+          for (var ri = 0; ri < results.length; ri++) {
+            if (results[ri] !== null) return results[ri];
+          }
+          return { status: "warning", exists: false, has_policy: false };
+        });
+      })();
+
+      // 22. IXP Route Server Participation (Bug 5 fix: fair scoring for bilateral peering)
       if (netId) {
-        validationPromises.ix_route_server = fetchJSON("https://www.peeringdb.com/api/netixlan?net_id=" + netId).then(function(ixData) {
+        validationPromises.ix_route_server = fetchPeeringDB("/netixlan?net_id=" + netId).then(function(ixData) {
           var connections = ixData && ixData.data ? ixData.data : [];
           var rsParticipants = connections.filter(function(c) { return c.is_rs_peer === true; });
-          return { status: connections.length > 0 && rsParticipants.length > 0 ? "pass" : "warning", total_ix_connections: connections.length, rs_peer_count: rsParticipants.length, rs_peer_pct: connections.length > 0 ? Math.round((rsParticipants.length / connections.length) * 100) : 0 };
+          var totalIx = connections.length;
+          var rsCount = rsParticipants.length;
+          var rsPct = totalIx > 0 ? Math.round((rsCount / totalIx) * 100) : 0;
+          var status, note;
+
+          if (totalIx > 0 && rsCount > 0) {
+            // Using route servers - good
+            status = "pass";
+            note = null;
+          } else if (totalIx >= 20 && rsCount === 0) {
+            // Large network with 20+ IX connections but no RS = deliberate bilateral peering policy
+            status = "pass";
+            note = "Bilateral peering policy - " + totalIx + " IX connections without route servers indicates deliberate policy choice";
+          } else if (totalIx < 5 && rsCount === 0) {
+            // Small number of IX connections and no RS - suggests misconfiguration
+            status = "warning";
+            note = "Only " + totalIx + " IX connections and no route server usage - consider enabling route server peering for better reachability";
+          } else {
+            // Medium network (5-19 IX) without RS - mild warning
+            status = "warning";
+            note = totalIx + " IX connections without route server usage";
+          }
+
+          return { status: status, total_ix_connections: totalIx, rs_peer_count: rsCount, rs_peer_pct: rsPct, note: note };
         }).catch(function(e) { return { status: "error", error: String(e) }; });
       } else {
         validationPromises.ix_route_server = Promise.resolve({ status: "warning", message: "No PeeringDB record found" });
       }
 
-      // 23. Resource Certification
-      validationPromises.resource_cert = Promise.all(
-        samplePrefixes.slice(0, 3).map(function(pfx) { return fetchRPKIPerPrefix(rawAsn, pfx); })
+      // 23. Resource Certification (local RPKI validation - all prefixes, all RIRs)
+      validationPromises.resource_cert = Promise.resolve(
+        allPrefixes.map(function(pfx) { return validateRPKILocal(rawAsn, pfx); })
       ).then(function(results) {
         var hasRoa = results.some(function(r) { return r.status === "valid" || r.validating_roas > 0; });
         return { status: hasRoa ? "pass" : "fail", has_roas: hasRoa, checked: results.length, roa_count: results.filter(function(r) { return r.status === "valid"; }).length };
@@ -1340,7 +1788,7 @@ const server = http.createServer(async (req, res) => {
 
       // Geolocation cross-ref with PeeringDB facilities
       var facCountriesPromise = netId
-        ? fetchJSON("https://www.peeringdb.com/api/netfac?net_id=" + netId).then(function(facData) {
+        ? fetchPeeringDB("/netfac?net_id=" + netId).then(function(facData) {
             return (facData && facData.data ? facData.data : []).map(function(f) { return f.country; }).filter(Boolean);
           }).catch(function() { return []; })
         : Promise.resolve([]);
@@ -1360,15 +1808,30 @@ const server = http.createServer(async (req, res) => {
         }
       });
 
-      // Enrich geolocation
+      // Enrich geolocation (Bug 4 fix: handle anycast/CDN/global networks)
       if (validations.geolocation && validations.geolocation.status !== "error") {
         var uniqueFacCountries = {};
         facCountries.forEach(function(c) { uniqueFacCountries[c] = true; });
+        var facCountryCount = Object.keys(uniqueFacCountries).length;
         validations.geolocation.pdb_facility_countries = Object.keys(uniqueFacCountries);
         var geoSet = {};
         (validations.geolocation.geo_countries || []).forEach(function(c) { geoSet[c] = true; });
-        var mismatches = Object.keys(geoSet).filter(function(c) { return !uniqueFacCountries[c] && Object.keys(uniqueFacCountries).length > 0; });
+        var geoCountryCount = Object.keys(geoSet).length;
+        var mismatches = Object.keys(geoSet).filter(function(c) { return !uniqueFacCountries[c] && facCountryCount > 0; });
         validations.geolocation.country_mismatches = mismatches;
+
+        // Detect global/anycast networks: 5+ facility countries OR Content/NSP type
+        var netInfoType = (net.info_type || "").toLowerCase();
+        var isGlobalNetwork = facCountryCount >= 5 || netInfoType === "content" || netInfoType === "nsp";
+        if (isGlobalNetwork && mismatches.length > 0) {
+          validations.geolocation.status = "pass";
+          validations.geolocation.note = "Global/anycast network - multi-country presence expected (" + facCountryCount + " facility countries, type: " + (net.info_type || "N/A") + ")";
+          validations.geolocation.country_mismatches = [];
+        } else if (facCountryCount <= 2 && geoCountryCount >= 10) {
+          // Actual anomaly: small network appearing in many countries
+          validations.geolocation.status = "warning";
+          validations.geolocation.note = "Prefixes geolocated in " + geoCountryCount + " countries but only " + facCountryCount + " facility countries - possible hijack or misconfiguration";
+        }
       }
 
       validations.bogon = bogonResult;
@@ -1444,48 +1907,43 @@ const server = http.createServer(async (req, res) => {
     const start = Date.now();
 
     try {
-      // ALL calls in parallel — single phase, no sequential waits
-      const [pdbNet, prefixData, neighbourData, overviewData, rirData, atlasProbeData, bgpHeData, visibilityData, prefixSizeData, pdbIxlan, pdbFac] = await Promise.all([
-        fetchJSON("https://www.peeringdb.com/api/net?asn=" + asn),
-        fetchJSON("https://stat.ripe.net/data/announced-prefixes/data.json?resource=AS" + asn),
-        fetchJSON("https://stat.ripe.net/data/asn-neighbours/data.json?resource=AS" + asn),
+      // Phase 0: Get PDB net first (fast, <1s) to get net_id for IX/Fac queries
+      const pdbNet = await fetchPeeringDB("/net?asn=" + asn);
+      const net = pdbNet?.data?.[0] || {};
+      const netId = net.id;
+
+      // Phase 1: ALL calls in parallel — RIPE Stat + PDB IX/Fac + Atlas + bgp.he.net
+      const promises = [
+        fetchJSON("https://stat.ripe.net/data/announced-prefixes/data.json?resource=AS" + asn, { timeout: 30000 }),
+        fetchJSON("https://stat.ripe.net/data/asn-neighbours/data.json?resource=AS" + asn, { timeout: 30000 }),
         fetchJSON("https://stat.ripe.net/data/as-overview/data.json?resource=AS" + asn),
         fetchJSON("https://stat.ripe.net/data/rir-stats-country/data.json?resource=AS" + asn),
         fetchJSON("https://atlas.ripe.net/api/v2/probes/?asn_v4=" + asn + "&page_size=500"),
         fetchBgpHeNet(asn),
-        fetchJSON("https://stat.ripe.net/data/visibility/data.json?resource=AS" + asn),
+        fetchJSON("https://stat.ripe.net/data/visibility/data.json?resource=AS" + asn, { timeout: 30000 }),
         fetchJSON("https://stat.ripe.net/data/prefix-size-distribution/data.json?resource=AS" + asn),
-        fetchJSON("https://www.peeringdb.com/api/netixlan?asn=" + asn),
-        fetchJSON("https://www.peeringdb.com/api/netfac?asn=" + asn),
-      ]);
+        netId ? fetchPeeringDB("/netixlan?net_id=" + netId) : Promise.resolve(null),
+        netId ? fetchPeeringDB("/netfac?net_id=" + netId) : Promise.resolve(null),
+      ];
+      const [prefixData, neighbourData, overviewData, rirData, atlasProbeData, bgpHeData, visibilityData, prefixSizeData, ixlanData, facData] = await Promise.all(promises);
 
-      const net = pdbNet?.data?.[0] || {};
-      const netId = net.id;
       const prefixes = prefixData?.data?.prefixes || [];
       const neighbours = neighbourData?.data?.neighbours || [];
       const overview = overviewData?.data || {};
       const rirEntries = rirData?.data?.located_resources || rirData?.data?.rir_stats || [];
 
+      // Bug 6 fix: Atlas probe status uses status.name (object), not status_name (flat)
       const atlasProbes = atlasProbeData?.results || [];
-      const atlasConnected = atlasProbes.filter(p => p.status_name === "Connected");
+      const atlasConnected = atlasProbes.filter(p => {
+        const sName = (p.status_name || (p.status && p.status.name) || "").toLowerCase();
+        return sName === "connected";
+      });
       const atlasAnchors = atlasProbes.filter(p => p.is_anchor === true);
 
-      // Use direct ASN query results, fallback to netId query if empty
-      let ixlanData = pdbIxlan;
-      let facData = pdbFac;
-      if ((!ixlanData?.data || ixlanData.data.length === 0) && netId) {
-        [ixlanData, facData] = await Promise.all([
-          fetchJSON("https://www.peeringdb.com/api/netixlan?net_id=" + netId),
-          fetchJSON("https://www.peeringdb.com/api/netfac?net_id=" + netId),
-        ]);
-      }
-
-      // RPKI: sample max 5+5 prefixes (v4+v6) in parallel
+      // RPKI: validate ALL prefixes using local Cloudflare RPKI data (all 5 RIRs, instant)
+      await ensureAspaCache();
       const allPrefixes = prefixes.map((p) => p.prefix);
-      const v4Pfx = allPrefixes.filter(p => !p.includes(":")).slice(0, 5);
-      const v6Pfx = allPrefixes.filter(p => p.includes(":")).slice(0, 5);
-      const samplePfx = [...v4Pfx, ...v6Pfx];
-      const rpkiAllResults = await Promise.all(samplePfx.map((pfx) => fetchRPKIPerPrefix(asn, pfx)));
+      const rpkiAllResults = allPrefixes.map((pfx) => validateRPKILocal(asn, pfx));
 
       const ixConnections = (ixlanData?.data || [])
         .map((ix) => ({
@@ -1552,15 +2010,17 @@ const server = http.createServer(async (req, res) => {
       const duration = Date.now() - start;
 
       // Compute routing visibility and prefix size distribution
-      const routingInfo = (function() {
+      const routingInfo = await (async function() {
         const ipv4Prefixes = prefixes.filter(function(p) { return !p.prefix.includes(":"); });
         const ipv6Prefixes = prefixes.filter(function(p) { return p.prefix.includes(":"); });
         var ipv4VisAvg = 0, ipv6VisAvg = 0, totalRisPeersV4 = 0, totalRisPeersV6 = 0;
 
         // Visibility API returns per-RIS-collector data
         // Each collector has ipv4_full_table_peer_count and ipv4_full_table_peers_not_seeing[]
+        // Bug 3 fix: visibility API may timeout for large ASNs — handle gracefully
         var visibilities = (visibilityData && visibilityData.data && visibilityData.data.visibilities) || [];
         var v4Seeing = 0, v4Total = 0, v6Seeing = 0, v6Total = 0;
+        var visTimedOut = !visibilityData || !visibilityData.data;
         visibilities.forEach(function(v) {
           if (!v || !v.probe) return;
           var v4PeerCount = v.ipv4_full_table_peer_count || 0;
@@ -1574,6 +2034,29 @@ const server = http.createServer(async (req, res) => {
         });
         if (v4Total > 0) ipv4VisAvg = Math.round((v4Seeing / v4Total) * 1000) / 10;
         if (v6Total > 0) ipv6VisAvg = Math.round((v6Seeing / v6Total) * 1000) / 10;
+        // If visibility API timed out but we have prefixes, try bgproutes.io fallback
+        if (visTimedOut && prefixes.length > 0) {
+          var fallbackPrefix = prefixes.find(function(p) { return !p.prefix.includes(":"); });
+          if (!fallbackPrefix) fallbackPrefix = prefixes[0];
+          if (fallbackPrefix) {
+            var bgprFallback = await fetchBgproutesVisibility(fallbackPrefix.prefix);
+            if (bgprFallback && bgprFallback.vps_seeing > 0) {
+              // Estimate visibility: % of VPs seeing the prefix (assume ~300 total RIS-equivalent VPs)
+              var estimatedTotal = Math.max(bgprFallback.vps_seeing, 300);
+              ipv4VisAvg = Math.round((bgprFallback.vps_seeing / estimatedTotal) * 1000) / 10;
+              ipv6VisAvg = -1; // bgproutes fallback is per-prefix, not per-AF aggregate
+              totalRisPeersV4 = bgprFallback.vps_seeing;
+              console.log("[Visibility] RIPE Stat timed out, used bgproutes.io fallback for " + fallbackPrefix.prefix + ": " + bgprFallback.vps_seeing + " VPs seeing it");
+            } else {
+              ipv4VisAvg = -1;
+              ipv6VisAvg = -1;
+              console.log("[Visibility] RIPE Stat timed out and bgproutes.io fallback returned no data");
+            }
+          } else {
+            ipv4VisAvg = -1;
+            ipv6VisAvg = -1;
+          }
+        }
         totalRisPeersV4 = v4Total;
         totalRisPeersV6 = v6Total;
 
@@ -1597,10 +2080,10 @@ const server = http.createServer(async (req, res) => {
       const result = {
         meta: {
           service: "PeerCortex",
-          version: "0.3.0",
+          version: "0.5.0",
           query: "AS" + asn,
           duration_ms: duration,
-          sources: ["PeeringDB", "RIPE Stat", "bgp.he.net"],
+          sources: ["PeeringDB", "RIPE Stat", "bgp.he.net", "Cloudflare RPKI", "Route Views"],
           timestamp: new Date().toISOString(),
           rpki_prefixes_checked: rpkiTotal,
           total_prefixes: prefixes.length,
@@ -1609,6 +2092,7 @@ const server = http.createServer(async (req, res) => {
           asn: parseInt(asn),
           name: net.name || overview?.holder || "Unknown",
           aka: net.aka || "",
+          org_name: (net.org && net.org.name) ? net.org.name : "",
           website: net.website || "",
           type: net.info_type || "",
           policy: net.policy_general || "",
@@ -1703,23 +2187,28 @@ const server = http.createServer(async (req, res) => {
     const start = Date.now();
     try {
       // ALL calls in parallel — single batch
-      const [pdb1, pdb2, nb1Data, nb2Data, pfx1Data, pfx2Data, ix1Data, ix2Data, fac1Data, fac2Data] = await Promise.all([
-        fetchJSON("https://www.peeringdb.com/api/net?asn=" + asn1),
-        fetchJSON("https://www.peeringdb.com/api/net?asn=" + asn2),
-        fetchJSON("https://stat.ripe.net/data/asn-neighbours/data.json?resource=AS" + asn1),
-        fetchJSON("https://stat.ripe.net/data/asn-neighbours/data.json?resource=AS" + asn2),
-        fetchJSON("https://stat.ripe.net/data/announced-prefixes/data.json?resource=AS" + asn1),
-        fetchJSON("https://stat.ripe.net/data/announced-prefixes/data.json?resource=AS" + asn2),
-        fetchJSON("https://www.peeringdb.com/api/netixlan?asn=" + asn1),
-        fetchJSON("https://www.peeringdb.com/api/netixlan?asn=" + asn2),
-        fetchJSON("https://www.peeringdb.com/api/netfac?asn=" + asn1),
-        fetchJSON("https://www.peeringdb.com/api/netfac?asn=" + asn2),
+      // Phase 1: Get PDB net objects + RIPE data
+      const [pdb1, pdb2, nb1Data, nb2Data, pfx1Data, pfx2Data] = await Promise.all([
+        fetchPeeringDB("/net?asn=" + asn1),
+        fetchPeeringDB("/net?asn=" + asn2),
+        fetchJSON("https://stat.ripe.net/data/asn-neighbours/data.json?resource=AS" + asn1, { timeout: 30000 }),
+        fetchJSON("https://stat.ripe.net/data/asn-neighbours/data.json?resource=AS" + asn2, { timeout: 30000 }),
+        fetchJSON("https://stat.ripe.net/data/announced-prefixes/data.json?resource=AS" + asn1, { timeout: 30000 }),
+        fetchJSON("https://stat.ripe.net/data/announced-prefixes/data.json?resource=AS" + asn2, { timeout: 30000 }),
       ]);
 
       const net1 = pdb1?.data?.[0] || {};
       const net2 = pdb2?.data?.[0] || {};
+      const netId1 = net1.id;
+      const netId2 = net2.id;
 
-      // IX + Facility data already fetched in parallel above
+      // Phase 2: IX + Facility using net_id (Bug 1 fix: netfac requires net_id, not asn)
+      const ixFacPromises = [];
+      ixFacPromises.push(netId1 ? fetchPeeringDB("/netixlan?net_id=" + netId1) : Promise.resolve(null));
+      ixFacPromises.push(netId2 ? fetchPeeringDB("/netixlan?net_id=" + netId2) : Promise.resolve(null));
+      ixFacPromises.push(netId1 ? fetchPeeringDB("/netfac?net_id=" + netId1) : Promise.resolve(null));
+      ixFacPromises.push(netId2 ? fetchPeeringDB("/netfac?net_id=" + netId2) : Promise.resolve(null));
+      const [ix1Data, ix2Data, fac1Data, fac2Data] = await Promise.all(ixFacPromises);
 
       const ix1Set = new Set((ix1Data?.data || []).map((ix) => ix.ix_id));
       const ix2Set = new Set((ix2Data?.data || []).map((ix) => ix.ix_id));
@@ -1834,7 +2323,7 @@ const server = http.createServer(async (req, res) => {
     const start = Date.now();
     try {
       // Search for IX by name
-      const ixSearch = await fetchJSON("https://www.peeringdb.com/api/ix?name__contains=" + encodeURIComponent(ixName));
+      const ixSearch = await fetchPeeringDB("/ix?name__contains=" + encodeURIComponent(ixName));
       const ixResults = ixSearch?.data || [];
       if (ixResults.length === 0) {
         return res.end(JSON.stringify({ error: "No IX found matching: " + ixName, matches: [] }));
@@ -1845,7 +2334,7 @@ const server = http.createServer(async (req, res) => {
       const ixId = ix.id;
 
       // Get ixlan for this IX
-      const ixlanData = await fetchJSON("https://www.peeringdb.com/api/ixlan?ix_id=" + ixId);
+      const ixlanData = await fetchPeeringDB("/ixlan?ix_id=" + ixId);
       const ixlans = ixlanData?.data || [];
       if (ixlans.length === 0) {
         return res.end(JSON.stringify({ ix: { id: ixId, name: ix.name }, matches: [] }));
@@ -1854,7 +2343,7 @@ const server = http.createServer(async (req, res) => {
       const ixlanId = ixlans[0].id;
 
       // Get all networks at this IX
-      const netixlanData = await fetchJSON("https://www.peeringdb.com/api/netixlan?ixlan_id=" + ixlanId);
+      const netixlanData = await fetchPeeringDB("/netixlan?ixlan_id=" + ixlanId);
       const netixlans = netixlanData?.data || [];
 
       // Get unique net_ids
@@ -1866,7 +2355,7 @@ const server = http.createServer(async (req, res) => {
       for (let i = 0; i < Math.min(netIds.length, 200); i += batchSize) {
         const batch = netIds.slice(i, i + batchSize);
         const batchResults = await Promise.all(
-          batch.map(nid => fetchJSON("https://www.peeringdb.com/api/net/" + nid))
+          batch.map(nid => fetchPeeringDB("/net/" + nid))
         );
         batchResults.forEach(r => {
           if (r?.data?.[0]) networks.push(r.data[0]);
@@ -1942,8 +2431,18 @@ const server = http.createServer(async (req, res) => {
       const firstSeen = routingStatus?.data?.first_seen?.time || null;
       const rpkiStatus = rpkiValid?.data?.status || "unknown";
       const rpkiRoas = rpkiValid?.data?.validating_roas || [];
-      const visData = visibility?.data?.visibilities || [];
-      const risPeersSeeingIt = visData.length > 0 ? visData.filter(v => v.ris_peers_seeing > 0).length : 0;
+      var visData = visibility?.data?.visibilities || [];
+      var risPeersSeeingIt = visData.length > 0 ? visData.filter(v => v.ris_peers_seeing > 0).length : 0;
+      var visibilitySource = "ripe_stat";
+      // bgproutes.io fallback if RIPE Stat visibility returned no data
+      if (visData.length === 0 && BGPROUTES_API_KEY) {
+        var bgprVis = await fetchBgproutesVisibility(prefix);
+        if (bgprVis && bgprVis.vps_seeing > 0) {
+          risPeersSeeingIt = bgprVis.vps_seeing;
+          visData = []; // keep empty, use risPeersSeeingIt
+          visibilitySource = "bgproutes.io";
+        }
+      }
 
       // Try to get IRR data
       let irrStatus = "unknown";
@@ -1960,7 +2459,7 @@ const server = http.createServer(async (req, res) => {
         origins: origins.map(o => ({ asn: o.asn, prefix: o.prefix })),
         rpki: { status: rpkiStatus, validating_roas: rpkiRoas.length },
         irr_status: irrStatus,
-        visibility: { ris_peers_seeing: risPeersSeeingIt, total_probes: visData.length },
+        visibility: { ris_peers_seeing: risPeersSeeingIt, total_probes: visData.length || risPeersSeeingIt, source: visibilitySource },
         first_seen: firstSeen,
       }, null, 2));
     } catch (err) {
@@ -1981,8 +2480,8 @@ const server = http.createServer(async (req, res) => {
     const start = Date.now();
     try {
       const [ixData, ixlanData] = await Promise.all([
-        fetchJSON("https://www.peeringdb.com/api/ix/" + ixId),
-        fetchJSON("https://www.peeringdb.com/api/ixlan?ix_id=" + ixId),
+        fetchPeeringDB("/ix/" + ixId),
+        fetchPeeringDB("/ixlan?ix_id=" + ixId),
       ]);
 
       const ix = ixData?.data?.[0] || {};
@@ -1991,7 +2490,7 @@ const server = http.createServer(async (req, res) => {
 
       let members = [];
       if (ixlanId) {
-        const netixlanData = await fetchJSON("https://www.peeringdb.com/api/netixlan?ixlan_id=" + ixlanId);
+        const netixlanData = await fetchPeeringDB("/netixlan?ixlan_id=" + ixlanId);
         members = (netixlanData?.data || []).map(m => ({
           asn: m.asn,
           name: m.name || "",
@@ -2080,8 +2579,143 @@ const server = http.createServer(async (req, res) => {
   );
 });
 
+
+// ============================================================
+// Atlas Probe Cache (for Lia's Atlas Paradise)
+// ============================================================
+let atlasProbeCache = null;
+let atlasProbeFetching = false;
+
+function fetchAllAtlasProbes() {
+  if (atlasProbeFetching) return Promise.resolve();
+  atlasProbeFetching = true;
+  console.log("[ATLAS] Fetching all Atlas probes...");
+
+  return new Promise(function(resolve) {
+    var allAsns = new Set();
+    var byCountry = {};
+    var pageCount = 0;
+    var maxPages = 40;
+
+    function fetchPage(pageUrl) {
+      if (pageCount >= maxPages) return finish();
+      pageCount++;
+
+      fetchJSON(pageUrl).then(function(data) {
+        if (!data || !data.results) return finish();
+
+        data.results.forEach(function(probe) {
+          var asn4 = probe.asn_v4;
+          var asn6 = probe.asn_v6;
+          var cc = probe.country_code || "XX";
+
+          if (!byCountry[cc]) byCountry[cc] = { total: 0, connected: 0, asnSet: new Set() };
+          byCountry[cc].total++;
+          if (probe.status && probe.status.id === 1) byCountry[cc].connected++;
+          if (asn4) { allAsns.add(asn4); byCountry[cc].asnSet.add(asn4); }
+          if (asn6) { allAsns.add(asn6); byCountry[cc].asnSet.add(asn6); }
+        });
+
+        if (data.next) {
+          fetchPage(data.next);
+        } else {
+          finish();
+        }
+      }).catch(function() { finish(); });
+    }
+
+    function finish() {
+      var byCountryOut = {};
+      Object.keys(byCountry).forEach(function(cc) {
+        var info = byCountry[cc];
+        byCountryOut[cc] = { total: info.total, connected: info.connected, asn_count: info.asnSet.size };
+      });
+
+      atlasProbeCache = {
+        total_probes: Object.keys(byCountry).reduce(function(s, cc) { return s + byCountry[cc].total; }, 0),
+        total_connected: Object.keys(byCountry).reduce(function(s, cc) { return s + byCountry[cc].connected; }, 0),
+        unique_asns_with_probes: allAsns.size,
+        asns_with_probes: Array.from(allAsns).sort(function(a, b) { return a - b; }),
+        by_country: byCountryOut,
+        fetched_at: new Date().toISOString(),
+        pages_fetched: pageCount,
+      };
+
+      console.log("[ATLAS] Loaded " + allAsns.size + " unique ASNs with probes (" + pageCount + " pages)");
+      atlasProbeFetching = false;
+      resolve();
+    }
+
+    fetchPage("https://atlas.ripe.net/api/v2/probes/?page_size=500&status=1&page=1&format=json");
+  });
+}
+
+// ============================================================
+// PeeringDB Org → Country Cache (for Lia's Paradise)
+// ============================================================
+let pdbOrgCountryMap = new Map(); // org_id → { country, name }
+
+function fetchPdbOrgCountries() {
+  console.log("[PDB-ORG] Fetching PeeringDB org countries...");
+  return new Promise(function(resolve) {
+    // Use raw https to handle the large 16MB response with streaming
+    var chunks = [];
+    var req = require("https").get("https://www.peeringdb.com/api/org?status=ok&depth=0", {
+      headers: {
+        "User-Agent": UA,
+        "Authorization": PEERINGDB_API_KEY ? "Api-Key " + PEERINGDB_API_KEY : undefined,
+      },
+      timeout: 120000,
+    }, function(res) {
+      res.on("data", function(chunk) { chunks.push(chunk); });
+      res.on("end", function() {
+        try {
+          var body = Buffer.concat(chunks).toString("utf8");
+          var data = JSON.parse(body);
+          if (data && data.data) {
+            pdbOrgCountryMap = new Map();
+            data.data.forEach(function(o) {
+              if (o.id && o.country) {
+                pdbOrgCountryMap.set(o.id, { country: o.country, name: o.name || "" });
+              }
+            });
+            console.log("[PDB-ORG] Loaded " + pdbOrgCountryMap.size + " org→country mappings");
+          }
+        } catch (e) {
+          console.error("[PDB-ORG] Parse error:", e.message);
+        }
+        resolve();
+      });
+    });
+    req.on("error", function(e) {
+      console.error("[PDB-ORG] Fetch error:", e.message);
+      resolve();
+    });
+    req.on("timeout", function() {
+      console.error("[PDB-ORG] Timeout after 120s");
+      req.destroy();
+      resolve();
+    });
+  });
+}
+
 const PORT = process.env.PORT || 3101;
-server.listen(PORT, "0.0.0.0", () => {
-  console.log("PeerCortex v0.3.0 running on http://0.0.0.0:" + PORT);
-  console.log("bgproutes.io API key: " + (BGPROUTES_API_KEY ? "configured" : "NOT configured"));
+
+// Fetch RPKI ASPA feed at startup and refresh every 10 minutes
+Promise.all([fetchRpkiAspaFeed(), fetchAllAtlasProbes(), fetchPdbOrgCountries()]).then(() => {
+  server.listen(PORT, "0.0.0.0", () => {
+    console.log("PeerCortex v0.4.0 running on http://0.0.0.0:" + PORT);
+    console.log("bgproutes.io API key: " + (BGPROUTES_API_KEY ? "configured" : "NOT configured"));
+    console.log("RPKI ASPA objects loaded: " + rpkiAspaMap.size);
+  });
 });
+
+// Refresh RPKI ASPA cache every 10 minutes
+setInterval(() => {
+  fetchRpkiAspaFeed();
+}, 10 * 60 * 1000);
+
+// Refresh Atlas probe cache every hour
+setInterval(function() {
+  fetchAllAtlasProbes();
+}, 60 * 60 * 1000);
