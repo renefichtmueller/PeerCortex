@@ -28,6 +28,31 @@ const PEERINGDB_API_URL = process.env.PEERINGDB_API_URL || "https://www.peeringd
 
 const UA = "PeerCortex/0.5.0 (+https://peercortex.org; contact: rene.fichtmueller@flexoptix.net)";
 
+// Static geocode cache for major networking cities (fallback when PDB facility coords missing)
+const CITY_COORDS = {
+  "amsterdam": [52.3676, 4.9041], "london": [51.5074, -0.1278], "frankfurt": [50.1109, 8.6821],
+  "paris": [48.8566, 2.3522], "stockholm": [59.3293, 18.0686], "zurich": [47.3769, 8.5417],
+  "berlin": [52.5200, 13.4050], "hamburg": [53.5511, 9.9937], "munich": [48.1351, 11.5820],
+  "vienna": [48.2082, 16.3738], "prague": [50.0755, 14.4378], "warsaw": [52.2297, 21.0122],
+  "copenhagen": [55.6761, 12.5683], "oslo": [59.9139, 10.7522], "helsinki": [60.1699, 24.9384],
+  "milan": [45.4642, 9.1900], "madrid": [40.4168, -3.7038], "lisbon": [38.7223, -9.1393],
+  "dublin": [53.3498, -6.2603], "brussels": [50.8503, 4.3517], "bucharest": [44.4268, 26.1025],
+  "sofia": [42.6977, 23.3219], "athens": [37.9838, 23.7275], "istanbul": [41.0082, 28.9784],
+  "moscow": [55.7558, 37.6173], "mumbai": [19.0760, 72.8777], "singapore": [1.3521, 103.8198],
+  "hong kong": [22.3193, 114.1694], "tokyo": [35.6762, 139.6503], "sydney": [-33.8688, 151.2093],
+  "los angeles": [34.0522, -118.2437], "new york": [40.7128, -74.0060], "chicago": [41.8781, -87.6298],
+  "dallas": [32.7767, -96.7970], "miami": [25.7617, -80.1918], "ashburn": [39.0438, -77.4874],
+  "seattle": [47.6062, -122.3321], "san jose": [37.3382, -121.8863], "toronto": [43.6532, -79.3832],
+  "sao paulo": [-23.5505, -46.6333], "johannesburg": [-26.2041, 28.0473], "meppel": [52.6966, 6.1940],
+  "manchester": [53.4808, -2.2426], "marseille": [43.2965, 5.3698], "dusseldorf": [51.2277, 6.7735],
+  "nuremberg": [49.4521, 11.0767], "tallinn": [59.4370, 24.7536], "riga": [56.9496, 24.1052],
+  "auckland": [-36.8485, 174.7633], "wellington": [-41.2865, 174.7762], "denver": [39.7392, -104.9903],
+  "atlanta": [33.7490, -84.3880], "portland": [45.5152, -122.6784], "vancouver": [49.2827, -123.1207],
+  "montreal": [45.5017, -73.5673], "mexico city": [19.4326, -99.1332], "seoul": [37.5665, 126.9780],
+  "taipei": [25.0330, 121.5654], "bangkok": [13.7563, 100.5018], "jakarta": [-6.2088, 106.8456],
+  "scotland": [55.9533, -3.1883], "edinburgh": [55.9533, -3.1883],
+};
+
 // ============================================================
 // Task 6: In-memory cache with TTL + Rate Limiting
 // ============================================================
@@ -2287,6 +2312,42 @@ const server = http.createServer(async (req, res) => {
         overall_confidence: overallConfidence,
         overall_agreement_pct: avgAgreement,
       };
+
+      // === IX Location Geocode Fallback ===
+      // Some IXPs have no facility coordinates in PeeringDB.
+      // Use ix_name city extraction + hard-coded IX→city map as fallback.
+      var ixIdsWithCoords = new Set(ixLocations.map(function(l) { return l.ix_id; }));
+      ixConnections.forEach(function(conn) {
+        if (ixIdsWithCoords.has(conn.ix_id)) return;
+        var name = conn.ix_name || "";
+        if (name) {
+          var words = name.toLowerCase().replace(/[^a-z\s]/g, " ").split(/\s+/).filter(Boolean);
+          for (var w = 0; w < words.length; w++) {
+            if (CITY_COORDS[words[w]]) {
+              ixLocations.push({ ix_id: conn.ix_id, name: name, city: words[w].charAt(0).toUpperCase() + words[w].slice(1), country: "", latitude: CITY_COORDS[words[w]][0], longitude: CITY_COORDS[words[w]][1], source: "name_geocode" });
+              ixIdsWithCoords.add(conn.ix_id);
+              return;
+            }
+            if (w < words.length - 1) {
+              var tw = words[w] + " " + words[w + 1];
+              if (CITY_COORDS[tw]) {
+                ixLocations.push({ ix_id: conn.ix_id, name: name, city: tw, country: "", latitude: CITY_COORDS[tw][0], longitude: CITY_COORDS[tw][1], source: "name_geocode" });
+                ixIdsWithCoords.add(conn.ix_id);
+                return;
+              }
+            }
+          }
+        }
+      });
+      // Hard-coded IX ID → city for well-known IXPs whose names don't contain city
+      var IX_CITY_MAP = { 60: "zurich", 2601: "meppel", 24: "london", 35: "moscow", 15: "chicago", 11: "seattle", 387: "dublin", 171: "warsaw", 168: "bucharest", 71: "milan", 66: "vienna", 62: "prague", 1: "ashburn" };
+      ixConnections.forEach(function(conn) {
+        if (ixIdsWithCoords.has(conn.ix_id)) return;
+        var city = IX_CITY_MAP[conn.ix_id];
+        if (city && CITY_COORDS[city]) {
+          ixLocations.push({ ix_id: conn.ix_id, name: conn.ix_name || ("IX " + conn.ix_id), city: city.charAt(0).toUpperCase() + city.slice(1), country: "", latitude: CITY_COORDS[city][0], longitude: CITY_COORDS[city][1], source: "ix_city_map" });
+        }
+      });
 
       const result = {
         meta: {
