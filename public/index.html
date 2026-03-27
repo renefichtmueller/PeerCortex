@@ -431,7 +431,7 @@ a{color:var(--blue);text-decoration:none;transition:color .2s}a:hover{color:var(
   </div>
 
   <!-- Network Footprint Map -->
-  <div class="card full hidden" id="mapCard">
+  <div class="card full" id="mapCard" style="display:none">
     <div class="card-title" style="cursor:pointer" onclick="toggleExpand(this)">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="10" r="3"/><path d="M12 21.7C17.3 17 20 13 20 10a8 8 0 10-16 0c0 3 2.7 7 8 11.7z"/></svg>
       Network Footprint Map
@@ -1242,10 +1242,11 @@ function renderDashboard(d) {
 
 var _pcMap = null;
 function renderNetworkMap(d) {
-  var mapEl = document.getElementById('mapCard');
+  var mapCard = document.getElementById('mapCard');
   var mapDiv = document.getElementById('networkMap');
-  if (!mapEl || !mapDiv || typeof L === 'undefined') return;
+  if (!mapCard || !mapDiv || typeof L === 'undefined') return;
 
+  // Collect all markers
   var markers = [];
   var facs = (d.facilities && d.facilities.list) || [];
   facs.forEach(function(f) {
@@ -1253,12 +1254,10 @@ function renderNetworkMap(d) {
       markers.push({ lat: f.latitude, lng: f.longitude, type: 'fac', name: f.name, detail: f.city + (f.country ? ', ' + f.country : '') });
     }
   });
-
   var ixLocs = d.ix_locations || [];
   var ixConns = (d.ix_presence && d.ix_presence.connections) || [];
   var ixSpeedMap = {};
   ixConns.forEach(function(c) { if (c.ix_id) ixSpeedMap[c.ix_id] = (ixSpeedMap[c.ix_id] || 0) + (c.speed_mbps || 0); });
-
   ixLocs.forEach(function(ix) {
     if (ix.latitude && ix.longitude) {
       var spd = ixSpeedMap[ix.ix_id] || 0;
@@ -1266,77 +1265,78 @@ function renderNetworkMap(d) {
     }
   });
 
-  if (markers.length === 0) { mapEl.classList.add('hidden'); return; }
-  mapEl.classList.remove('hidden');
+  if (markers.length === 0) { mapCard.style.display = 'none'; return; }
 
-  // Defer map init to next frame so container has real dimensions after display:none removal
-  window._pcMapMarkers = markers;
-  window._pcMapFacs = facs;
-  requestAnimationFrame(function() {
-    requestAnimationFrame(function() {
-      _initLeafletMap(mapDiv, window._pcMapMarkers, window._pcMapFacs);
-    });
-  });
-}
+  // KEY FIX: Set display + explicit pixel dimensions BEFORE creating Leaflet map
+  mapCard.style.display = 'block';
+  var cardWidth = mapCard.getBoundingClientRect().width;
+  mapDiv.style.width = (cardWidth - 40) + 'px';
+  mapDiv.style.height = '450px';
 
-function _initLeafletMap(mapDiv, markers, facs) {
+  // Destroy previous map
   if (_pcMap) { _pcMap.remove(); _pcMap = null; }
-  _pcMap = L.map(mapDiv, { scrollWheelZoom: false, attributionControl: false });
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-    maxZoom: 18, subdomains: 'abcd'
-  }).addTo(_pcMap);
-  L.control.attribution({ prefix: false }).addAttribution('&copy; <a href="https://carto.com">CARTO</a>').addTo(_pcMap);
 
-  var bounds = L.latLngBounds();
-  markers.forEach(function(m) {
-    var color = m.type === 'fac' ? '#7dcfff' : '#ff9e64';
-    var radius = m.type === 'fac' ? 6 : 5;
-    var circle = L.circleMarker([m.lat, m.lng], {
-      radius: radius, fillColor: color, fillOpacity: 0.85, color: color, weight: 1, opacity: 0.6
-    }).addTo(_pcMap);
-    var popupDiv = document.createElement('div');
-    popupDiv.style.cssText = 'font-family:Inter,sans-serif;font-size:12px';
-    var nameEl = document.createElement('b');
-    nameEl.textContent = m.name;
-    popupDiv.appendChild(nameEl);
-    if (m.detail) {
-      var br = document.createElement('br');
-      popupDiv.appendChild(br);
-      var detailEl = document.createElement('span');
-      detailEl.textContent = m.detail;
-      popupDiv.appendChild(detailEl);
-    }
-    circle.bindPopup(popupDiv);
-    bounds.extend([m.lat, m.lng]);
-  });
-
-  // Draw faint lines between facilities in the same country
-  var facByCountry = {};
-  facs.forEach(function(f) {
-    if (f.latitude && f.longitude && f.country) {
-      if (!facByCountry[f.country]) facByCountry[f.country] = [];
-      facByCountry[f.country].push([f.latitude, f.longitude]);
-    }
-  });
-  Object.keys(facByCountry).forEach(function(c) {
-    var pts = facByCountry[c];
-    if (pts.length >= 2 && pts.length <= 15) {
-      for (var i = 0; i < pts.length - 1; i++) {
-        L.polyline([pts[i], pts[i + 1]], { color: '#bb9af7', weight: 1, opacity: 0.3 }).addTo(_pcMap);
-      }
-    }
-  });
-
-  _pcMap.fitBounds(bounds, { padding: [30, 30], maxZoom: 6 });
-  // Fix tile rendering in initially-hidden containers
+  // Use setTimeout to let the browser fully lay out the container
   setTimeout(function() {
-    if (_pcMap) {
-      _pcMap.invalidateSize();
+    // Re-measure after layout
+    var w = mapDiv.getBoundingClientRect().width;
+    if (w < 100) { mapDiv.style.width = '100%'; }
+
+    _pcMap = L.map(mapDiv, { scrollWheelZoom: false, attributionControl: false });
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+      maxZoom: 18, subdomains: 'abcd'
+    }).addTo(_pcMap);
+    L.control.attribution({ prefix: false }).addAttribution('&copy; <a href="https://carto.com">CARTO</a>').addTo(_pcMap);
+
+    var bounds = L.latLngBounds();
+    markers.forEach(function(m) {
+      var color = m.type === 'fac' ? '#7dcfff' : '#ff9e64';
+      var radius = m.type === 'fac' ? 7 : 6;
+      var circle = L.circleMarker([m.lat, m.lng], {
+        radius: radius, fillColor: color, fillOpacity: 0.85, color: color, weight: 1, opacity: 0.6
+      }).addTo(_pcMap);
+      var popupDiv = document.createElement('div');
+      popupDiv.style.cssText = 'font-family:Inter,sans-serif;font-size:12px';
+      var nameEl = document.createElement('b');
+      nameEl.textContent = m.name;
+      popupDiv.appendChild(nameEl);
+      if (m.detail) {
+        popupDiv.appendChild(document.createElement('br'));
+        var detailEl = document.createElement('span');
+        detailEl.textContent = m.detail;
+        popupDiv.appendChild(detailEl);
+      }
+      circle.bindPopup(popupDiv);
+      bounds.extend([m.lat, m.lng]);
+    });
+
+    // Faint lines between facilities in same country
+    var facByCountry = {};
+    facs.forEach(function(f) {
+      if (f.latitude && f.longitude && f.country) {
+        if (!facByCountry[f.country]) facByCountry[f.country] = [];
+        facByCountry[f.country].push([f.latitude, f.longitude]);
+      }
+    });
+    Object.keys(facByCountry).forEach(function(cc) {
+      var pts = facByCountry[cc];
+      if (pts.length >= 2 && pts.length <= 15) {
+        for (var i = 0; i < pts.length - 1; i++) {
+          L.polyline([pts[i], pts[i + 1]], { color: '#bb9af7', weight: 1, opacity: 0.3 }).addTo(_pcMap);
+        }
+      }
+    });
+
+    if (bounds.isValid()) {
       _pcMap.fitBounds(bounds, { padding: [30, 30], maxZoom: 6 });
     }
-  }, 500);
-}
 
+    // Final invalidateSize after everything is rendered
+    setTimeout(function() {
+      if (_pcMap) _pcMap.invalidateSize();
+    }, 300);
+  }, 50);
+}
 
 function renderAtlas(atlas) {
   if (!atlas) {
