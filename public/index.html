@@ -2553,6 +2553,58 @@ function renderHealthReport(d) {
 
   h += '</div></div></div>';
 
+  // === DATA ACCURACY SECTION ===
+  h += '<div style="margin:1.5rem 0;padding:1rem;background:rgba(122,162,247,.06);border:1px solid rgba(122,162,247,.15);border-radius:10px">';
+  h += '<div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.75rem"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#7aa2f7" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>';
+  h += '<span style="font-size:.85rem;font-weight:600;color:#7aa2f7">Score Breakdown — Why ' + score + '/100?</span></div>';
+
+  // Score calculation table
+  h += '<table style="width:100%;font-size:.78rem;border-collapse:collapse">';
+  h += '<tr style="color:var(--muted);border-bottom:1px solid var(--border)"><th style="text-align:left;padding:.3rem .5rem">Check</th><th style="width:60px;text-align:center;padding:.3rem">Weight</th><th style="width:60px;text-align:center;padding:.3rem">Earned</th><th style="text-align:left;padding:.3rem .5rem">Reason</th></tr>';
+
+  var weightMap = { bogon: 15, irr: 10, rpki_completeness: 15, abuse_contact: 5, blocklist: 15, manrs: 5, rdns: 5, visibility: 10, rpsl: 5, ix_route_server: 5, resource_cert: 10 };
+  var totalW = 0, totalE = 0;
+  checkOrder.forEach(function(key) {
+    var v = validations[key];
+    if (!v) return;
+    var w = weightMap[key] || 0;
+    if (w === 0) return; // communities, geolocation not scored
+    var info = checkLabels[key] || { label: key };
+    var earned = 0;
+    var reason = '';
+    if (v.status === 'info') {
+      reason = '<span style="color:var(--muted)">Excluded — unable to verify (API requires authentication)</span>';
+      // info checks excluded from scoring
+    } else {
+      if (v.status === 'pass') { earned = w; reason = '<span style="color:var(--green)">Full points</span>'; }
+      else if (v.status === 'warning') { earned = Math.round(w * 0.5); reason = '<span style="color:var(--orange)">' + escHtml(v.note || v.message || 'Partial compliance') + '</span>'; }
+      else { earned = 0; reason = '<span style="color:var(--red)">' + escHtml(v.note || v.message || 'Check failed') + '</span>'; }
+      totalW += w;
+      totalE += earned;
+    }
+    var statusIcon = v.status === 'pass' ? '✅' : v.status === 'warning' ? '⚠️' : v.status === 'fail' ? '❌' : 'ℹ️';
+    h += '<tr style="border-bottom:1px solid rgba(255,255,255,.03)"><td style="padding:.35rem .5rem">' + statusIcon + ' ' + info.label + '</td>';
+    h += '<td style="text-align:center;padding:.35rem;color:var(--muted)">' + (v.status === 'info' ? '—' : w) + '</td>';
+    h += '<td style="text-align:center;padding:.35rem;font-weight:600;color:' + (earned === w ? 'var(--green)' : earned > 0 ? 'var(--orange)' : v.status === 'info' ? 'var(--muted)' : 'var(--red)') + '">' + (v.status === 'info' ? '—' : earned) + '</td>';
+    h += '<td style="padding:.35rem .5rem;font-size:.72rem">' + reason + '</td></tr>';
+  });
+
+  var calcScore = totalW > 0 ? Math.round((totalE / totalW) * 100) : 0;
+  h += '<tr style="border-top:2px solid var(--border);font-weight:700"><td style="padding:.4rem .5rem">Total</td>';
+  h += '<td style="text-align:center;padding:.4rem">' + totalW + '</td>';
+  h += '<td style="text-align:center;padding:.4rem;color:' + scoreColor + '">' + totalE + '</td>';
+  h += '<td style="padding:.4rem .5rem;color:' + scoreColor + '">' + calcScore + '/100 = ' + totalE + '/' + totalW + ' weighted points</td></tr>';
+  h += '</table>';
+
+  // Data source note
+  h += '<div style="margin-top:.75rem;padding-top:.6rem;border-top:1px solid rgba(255,255,255,.05);font-size:.72rem;color:var(--muted)">';
+  h += '<strong>Data Sources:</strong> PeeringDB (profile, IX, facilities), RIPE Stat (prefixes, neighbours, visibility, RPKI), ';
+  h += 'RIPE Atlas (probes), Cloudflare RPKI (ROA + ASPA), MANRS Observatory, RIPE DB (IRR objects).<br>';
+  h += '<strong>Scoring:</strong> Each check has a weight reflecting its importance to routing security. ';
+  h += '"Pass" = full weight, "Warning" = 50%, "Fail" = 0%, "Info" = excluded (unable to verify). ';
+  h += 'Score = earned / total_weight × 100. Checks marked "info" (e.g., MANRS when API is unavailable) are excluded from the denominator to avoid unfair penalties.';
+  h += '</div></div>';
+
   // Expandable details
   h += '<div class="expand-toggle" onclick="toggleExpand(this)">Show detailed validation results</div>';
   h += '<div class="expand-body">';
