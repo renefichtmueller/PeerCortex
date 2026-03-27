@@ -279,6 +279,22 @@ function fetchPeeringDB(path, options) {
   return fetchJSON(url, { ...options, headers: { ...(options && options.headers || {}), ...headers } });
 }
 
+// PeeringDB fetch with one retry on failure (handles transient rate-limits)
+async function fetchPeeringDBWithRetry(path, options) {
+  const result = await fetchPeeringDB(path, options);
+  if (result !== null) return result;
+  await new Promise(r => setTimeout(r, 1500));
+  return fetchPeeringDB(path, options);
+}
+
+// Generic JSON fetch with one retry — for sources that occasionally fail under load (RIPE Stat, Atlas)
+async function fetchJSONWithRetry(url, options) {
+  const result = await fetchJSON(url, options);
+  if (result !== null) return result;
+  await new Promise(r => setTimeout(r, 1000));
+  return fetchJSON(url, options);
+}
+
 // bgproutes.io visibility fallback helper
 // Queries the RIB endpoint to estimate prefix visibility across vantage points
 function fetchBgproutesVisibility(prefix) {
@@ -340,6 +356,10 @@ function fetchJSON(url, options) {
         res.on("data", (chunk) => (data += chunk));
         res.on("end", () => {
           clearTimeout(timer);
+          if (res.statusCode === 429) {
+            console.warn("[PDB] Rate limited (429):", url.substring(0, 80));
+            return resolve(null);
+          }
           try {
             resolve(JSON.parse(data));
           } catch (_e) {
@@ -2055,22 +2075,31 @@ const server = http.createServer(async (req, res) => {
 
     try {
       // Phase 0: Get PDB net first (fast, <1s) to get net_id for IX/Fac queries
-      const pdbNet = await fetchPeeringDB("/net?asn=" + asn);
+      // Use retry to handle transient rate-limits
+      const pdbNet = await fetchPeeringDBWithRetry("/net?asn=" + asn);
       const net = pdbNet?.data?.[0] || {};
       const netId = net.id;
 
       // Phase 1: ALL calls in parallel — RIPE Stat + PDB IX/Fac + Atlas + bgp.he.net
+      // IX/Fac: use net_id when available (canonical), fall back to asn/local_asn filter
+      // &limit=1000 prevents truncation for large networks (default PeeringDB limit is 250)
+      const ixQuery = netId
+        ? "/netixlan?net_id=" + netId + "&limit=1000"
+        : "/netixlan?asn=" + asn + "&limit=1000";
+      const facQuery = netId
+        ? "/netfac?net_id=" + netId + "&limit=1000"
+        : "/netfac?local_asn=" + asn + "&limit=1000";
       const promises = [
-        fetchJSON("https://stat.ripe.net/data/announced-prefixes/data.json?resource=AS" + asn, { timeout: 30000 }),
-        fetchJSON("https://stat.ripe.net/data/asn-neighbours/data.json?resource=AS" + asn, { timeout: 30000 }),
+        fetchJSONWithRetry("https://stat.ripe.net/data/announced-prefixes/data.json?resource=AS" + asn, { timeout: 30000 }),
+        fetchJSONWithRetry("https://stat.ripe.net/data/asn-neighbours/data.json?resource=AS" + asn, { timeout: 30000 }),
         fetchJSON("https://stat.ripe.net/data/as-overview/data.json?resource=AS" + asn),
         fetchJSON("https://stat.ripe.net/data/rir-stats-country/data.json?resource=AS" + asn),
         fetchJSON("https://atlas.ripe.net/api/v2/probes/?asn_v4=" + asn + "&page_size=500"),
         fetchBgpHeNet(asn),
         fetchJSON("https://stat.ripe.net/data/visibility/data.json?resource=AS" + asn, { timeout: 30000 }),
         fetchJSON("https://stat.ripe.net/data/prefix-size-distribution/data.json?resource=AS" + asn),
-        netId ? fetchPeeringDB("/netixlan?net_id=" + netId) : Promise.resolve(null),
-        netId ? fetchPeeringDB("/netfac?net_id=" + netId) : Promise.resolve(null),
+        fetchPeeringDBWithRetry(ixQuery),
+        fetchPeeringDBWithRetry(facQuery),
       ];
       const [prefixData, neighbourData, overviewData, rirData, atlasProbeData, bgpHeData, visibilityData, prefixSizeData, ixlanData, facData] = await Promise.all(promises);
 
