@@ -726,8 +726,8 @@ async function fetchBgpHeNet(asn) {
     const result = {};
     const titleMatch = html.match(/<title>([^<]+)<\/title>/i);
     if (titleMatch) result.title = titleMatch[1].trim();
-    const peerMatch = html.match(/Observed\s+Peers[^<]*<[^>]*>\s*(\d+)/i) || html.match(/(\d+)\s+Peers/i);
-    if (peerMatch) result.peer_count = parseInt(peerMatch[1]);
+    const peerMatch = html.match(/BGP\s+Peers\s+Observed\s*\(all\)\s*:\s*(\d[\d,]*)/i) || html.match(/Observed\s+Peers[^<]*<[^>]*>\s*(\d+)/i);
+    if (peerMatch) result.peer_count = parseInt(peerMatch[1].replace(/,/g, ''));
     const countryMatch = html.match(/Country[^<]*<[^>]*>[^<]*<[^>]*>\s*<[^>]*>([^<]+)/i);
     if (countryMatch) result.country = countryMatch[1].trim();
     const lgMatch = html.match(/Looking\s+Glass[^<]*<[^>]*href="([^"]+)"/i);
@@ -736,10 +736,13 @@ async function fetchBgpHeNet(asn) {
     if (descMatch) result.description = descMatch[1].trim();
     const irrMatch = html.match(/IRR\s+Record[^<]*<[^>]*>[^<]*<[^>]*>([^<]+)/i);
     if (irrMatch) result.irr_record = irrMatch[1].trim();
-    const v4Match = html.match(/Prefixes\s+v4[^<]*<[^>]*>\s*(\d+)/i) || html.match(/IPv4\s+Prefixes[^<]*<[^>]*>\s*(\d+)/i);
-    if (v4Match) result.prefixes_v4 = parseInt(v4Match[1]);
-    const v6Match = html.match(/Prefixes\s+v6[^<]*<[^>]*>\s*(\d+)/i) || html.match(/IPv6\s+Prefixes[^<]*<[^>]*>\s*(\d+)/i);
-    if (v6Match) result.prefixes_v6 = parseInt(v6Match[1]);
+    // bgp.he.net format: "Prefixes Originated (v4): 147<br/>" or "Prefixes v4 ... <td>147"
+    const v4Match = html.match(/Prefixes\s+Originated\s*\(v4\)\s*:\s*(\d[\d,]*)/i) || html.match(/Prefixes\s+v4[^<]*<[^>]*>\s*(\d+)/i);
+    if (v4Match) result.prefixes_v4 = parseInt(v4Match[1].replace(/,/g, ''));
+    const v6Match = html.match(/Prefixes\s+Originated\s*\(v6\)\s*:\s*(\d[\d,]*)/i) || html.match(/Prefixes\s+v6[^<]*<[^>]*>\s*(\d+)/i);
+    if (v6Match) result.prefixes_v6 = parseInt(v6Match[1].replace(/,/g, ''));
+    const allMatch = html.match(/Prefixes\s+Originated\s*\(all\)\s*:\s*(\d[\d,]*)/i);
+    if (allMatch) result.prefixes_all = parseInt(allMatch[1].replace(/,/g, ''));
     result.source_url = "https://bgp.he.net/AS" + asn;
     return result;
   } catch (_e) {
@@ -940,14 +943,8 @@ const server = http.createServer(async (req, res) => {
     return res.end();
   }
 
-  let url, reqPath;
-  try {
-    url = new URL(req.url, "http://localhost");
-    reqPath = url.pathname;
-  } catch (_) {
-    res.writeHead(400);
-    return res.end("Bad Request");
-  }
+  const url = new URL(req.url, "http://localhost");
+  const reqPath = url.pathname;
 
   // Serve static files
   if (reqPath === "/" || reqPath === "/index.html") {
