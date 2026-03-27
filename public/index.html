@@ -1269,6 +1269,17 @@ function renderNetworkMap(d) {
   if (markers.length === 0) { mapEl.classList.add('hidden'); return; }
   mapEl.classList.remove('hidden');
 
+  // Defer map init to next frame so container has real dimensions after display:none removal
+  window._pcMapMarkers = markers;
+  window._pcMapFacs = facs;
+  requestAnimationFrame(function() {
+    requestAnimationFrame(function() {
+      _initLeafletMap(mapDiv, window._pcMapMarkers, window._pcMapFacs);
+    });
+  });
+}
+
+function _initLeafletMap(mapDiv, markers, facs) {
   if (_pcMap) { _pcMap.remove(); _pcMap = null; }
   _pcMap = L.map(mapDiv, { scrollWheelZoom: false, attributionControl: false });
   L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
@@ -1323,7 +1334,7 @@ function renderNetworkMap(d) {
       _pcMap.invalidateSize();
       _pcMap.fitBounds(bounds, { padding: [30, 30], maxZoom: 6 });
     }
-  }, 200);
+  }, 500);
 }
 
 

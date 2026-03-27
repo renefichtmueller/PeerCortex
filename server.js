@@ -2875,9 +2875,23 @@ function fetchAllAtlasProbes() {
 let pdbOrgCountryMap = new Map(); // org_id → { country, name }
 
 function fetchPdbOrgCountries() {
-  console.log("[PDB-ORG] Fetching PeeringDB org countries...");
+  var cacheFile = require("path").join(__dirname, ".pdb-org-cache.json");
+  var fs = require("fs");
+  
+  // Try disk cache first (valid for 24h)
+  try {
+    var stat = fs.statSync(cacheFile);
+    var ageHours = (Date.now() - stat.mtimeMs) / 3600000;
+    if (ageHours < 24) {
+      var cached = JSON.parse(fs.readFileSync(cacheFile, "utf8"));
+      pdbOrgCountryMap = new Map(Object.entries(cached));
+      console.log("[PDB-ORG] Loaded " + pdbOrgCountryMap.size + " orgs from disk cache (" + Math.round(ageHours) + "h old)");
+      return Promise.resolve();
+    }
+  } catch (_) { /* no cache or invalid */ }
+
+  console.log("[PDB-ORG] Fetching PeeringDB org countries (fresh)...");
   return new Promise(function(resolve) {
-    // Use raw https to handle the large 16MB response with streaming
     var chunks = [];
     var req = require("https").get("https://www.peeringdb.com/api/org?status=ok&depth=0", {
       headers: {
@@ -2886,6 +2900,11 @@ function fetchPdbOrgCountries() {
       },
       timeout: 120000,
     }, function(res) {
+      if (res.statusCode !== 200) {
+        console.error("[PDB-ORG] HTTP " + res.statusCode + " — using stale cache or empty");
+        resolve();
+        return;
+      }
       res.on("data", function(chunk) { chunks.push(chunk); });
       res.on("end", function() {
         try {
@@ -2893,12 +2912,16 @@ function fetchPdbOrgCountries() {
           var data = JSON.parse(body);
           if (data && data.data) {
             pdbOrgCountryMap = new Map();
+            var cacheObj = {};
             data.data.forEach(function(o) {
               if (o.id && o.country) {
                 pdbOrgCountryMap.set(o.id, { country: o.country, name: o.name || "" });
+                cacheObj[o.id] = { country: o.country, name: o.name || "" };
               }
             });
-            console.log("[PDB-ORG] Loaded " + pdbOrgCountryMap.size + " org→country mappings");
+            // Save to disk cache
+            try { fs.writeFileSync(cacheFile, JSON.stringify(cacheObj)); } catch (_) {}
+            console.log("[PDB-ORG] Loaded " + pdbOrgCountryMap.size + " org→country mappings (cached to disk)");
           }
         } catch (e) {
           console.error("[PDB-ORG] Parse error:", e.message);
