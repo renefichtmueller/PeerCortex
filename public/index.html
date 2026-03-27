@@ -1317,6 +1317,13 @@ function renderNetworkMap(d) {
   });
 
   _pcMap.fitBounds(bounds, { padding: [30, 30], maxZoom: 6 });
+  // Fix tile rendering in initially-hidden containers
+  setTimeout(function() {
+    if (_pcMap) {
+      _pcMap.invalidateSize();
+      _pcMap.fitBounds(bounds, { padding: [30, 30], maxZoom: 6 });
+    }
+  }, 200);
 }
 
 
