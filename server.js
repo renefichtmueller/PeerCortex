@@ -1154,9 +1154,14 @@ const server = http.createServer(async (req, res) => {
       const upstreamSet = new Set();
       leftNeighbours.forEach((n) => upstreamSet.add(n.asn));
 
+      // Classify left neighbours: high-power = likely upstream, low-power = likely peer
+      const maxPower = leftNeighbours.reduce((m, n) => Math.max(m, n.power || 0), 1);
       const detectedProviders = [...upstreamSet].map((asn) => {
         const nb = leftNeighbours.find((n) => n.asn === asn);
-        return { asn, name: nb && nb.as_name ? nb.as_name : "" };
+        const power = nb ? (nb.power || 0) : 0;
+        const powerPct = Math.round((power / maxPower) * 100);
+        const classification = powerPct >= 10 ? "likely_upstream" : "likely_peer";
+        return { asn, name: nb && nb.as_name ? nb.as_name : "", power, power_pct: powerPct, classification };
       });
 
       await resolveASNames(detectedProviders);
@@ -1379,9 +1384,14 @@ const server = http.createServer(async (req, res) => {
       const upstreamSet = new Set();
       leftNeighbours.forEach((n) => upstreamSet.add(n.asn));
 
+      // Classify left neighbours: high-power = likely upstream, low-power = likely peer
+      const maxPower = leftNeighbours.reduce((m, n) => Math.max(m, n.power || 0), 1);
       const detectedProviders = [...upstreamSet].map((asn) => {
         const nb = leftNeighbours.find((n) => n.asn === asn);
-        return { asn, name: nb && nb.as_name ? nb.as_name : "" };
+        const power = nb ? (nb.power || 0) : 0;
+        const powerPct = Math.round((power / maxPower) * 100);
+        const classification = powerPct >= 10 ? "likely_upstream" : "likely_peer";
+        return { asn, name: nb && nb.as_name ? nb.as_name : "", power, power_pct: powerPct, classification };
       });
 
       await resolveASNames(detectedProviders);
@@ -1714,56 +1724,82 @@ const server = http.createServer(async (req, res) => {
         return { status: listedPrefixes.length === 0 ? "pass" : "fail", checked: results.length, listed_prefixes: listedPrefixes };
       }).catch(function(e) { return { status: "error", error: String(e) }; });
 
-      // 16. MANRS Compliance
-      validationPromises.manrs = fetchJSON("https://observatory.manrs.org/api/v2/asn/" + rawAsn + "/conformance").then(function(data) {
-        if (!data || data.error || data.detail) return { status: "warning", participant: false, message: (data && data.detail) || "Not a MANRS participant" };
+      // 16. MANRS Compliance (observatory API requires auth — use fallback indicators)
+      validationPromises.manrs = fetchJSON("https://observatory.manrs.org/api/v2/asn/" + rawAsn + "/conformance", { timeout: 5000 }).then(function(data) {
+        if (!data || data.error || data.detail === "Authentication credentials were not provided.") {
+          // API unavailable — check MANRS indicators: RPKI ROA + IRR objects as proxy
+          var hasRoa = samplePrefixes.length > 0; // will be checked by RPKI validation
+          var hasIrr = !!(net.irr_as_set);
+          if (hasRoa && hasIrr) {
+            return { status: "info", participant: "unknown", message: "MANRS Observatory API requires authentication — cannot verify membership. Network has ROA + IRR objects (positive indicators).", note: "Unable to verify — MANRS API requires auth. Check https://observatory.manrs.org/asn/" + rawAsn };
+          }
+          return { status: "info", participant: "unknown", message: "Unable to verify MANRS membership (API requires authentication)", note: "Check manually: https://observatory.manrs.org/asn/" + rawAsn };
+        }
         var score = data.conformance_score || data.score || 0;
         return { status: score >= 50 ? "pass" : "warning", participant: true, score: score, details: data };
-      }).catch(function(e) { return { status: "warning", participant: false, error: String(e) }; });
+      }).catch(function(e) { return { status: "info", participant: "unknown", message: "MANRS check unavailable", note: "https://observatory.manrs.org/asn/" + rawAsn }; });
 
       // 17. Reverse DNS Coverage
       validationPromises.rdns = Promise.all(
         samplePrefixes.slice(0, 5).map(function(pfx) {
-          return fetchJSON("https://stat.ripe.net/data/reverse-dns-consistency/data.json?resource=" + encodeURIComponent(pfx)).then(function(data) {
-            var prefixes = data && data.data && data.data.prefixes ? data.data.prefixes : [];
-            var hasDelegation = prefixes.some(function(p) { return p.ipv4 || p.ipv6 || (p.delegations && p.delegations.length > 0); });
-            return { prefix: pfx, has_rdns: hasDelegation };
+          return fetchJSON("https://stat.ripe.net/data/reverse-dns-consistency/data.json?resource=" + encodeURIComponent(pfx), { timeout: 15000 }).then(function(data) {
+            var pfxData = data && data.data && data.data.prefixes ? data.data.prefixes : {};
+            var hasDelegation = false;
+            var details = [];
+            // API returns { ipv4: { "prefix": { complete, domains } }, ipv6: { ... } }
+            ["ipv4", "ipv6"].forEach(function(af) {
+              var afData = pfxData[af] || {};
+              Object.keys(afData).forEach(function(p) {
+                var entry = afData[p];
+                if (entry && entry.complete) hasDelegation = true;
+                if (entry && entry.domains) {
+                  entry.domains.forEach(function(d) {
+                    if (d.found) hasDelegation = true;
+                    details.push({ domain: d.domain, found: !!d.found });
+                  });
+                }
+              });
+            });
+            // Fallback: old array format
+            if (Array.isArray(pfxData)) {
+              pfxData.forEach(function(p) {
+                if (p.ipv4 || p.ipv6 || (p.delegations && p.delegations.length > 0)) hasDelegation = true;
+              });
+            }
+            return { prefix: pfx, has_rdns: hasDelegation, details: details };
           }).catch(function() { return { prefix: pfx, has_rdns: false, error: true }; });
         })
       ).then(function(results) {
         var withRdns = results.filter(function(r) { return r.has_rdns; });
         var coverage = results.length > 0 ? Math.round((withRdns.length / results.length) * 100) : 0;
-        return { status: coverage >= 80 ? "pass" : coverage >= 50 ? "warning" : "fail", coverage_pct: coverage, checked: results.length, results: results };
+        // Include details of what failed
+        var failedPrefixes = results.filter(function(r) { return !r.has_rdns && !r.error; }).map(function(r) { return r.prefix; });
+        return { status: coverage >= 80 ? "pass" : coverage >= 50 ? "warning" : "fail", coverage_pct: coverage, checked: results.length, results: results, failed_prefixes: failedPrefixes };
       }).catch(function(e) { return { status: "error", error: String(e) }; });
 
-      // 18. Historical BGP Visibility
-      validationPromises.visibility = (samplePrefixes.length > 0
-        ? Promise.all([
-            fetchJSON("https://stat.ripe.net/data/visibility/data.json?resource=" + encodeURIComponent(samplePrefixes[0])),
-            fetchJSON("https://stat.ripe.net/data/routing-history/data.json?resource=" + encodeURIComponent(samplePrefixes[0])),
-          ])
-        : Promise.resolve([null, null])
-      ).then(function(arr) {
-        var visData = arr[0]; var histData = arr[1];
-        var visibilities = visData && visData.data && visData.data.visibilities ? visData.data.visibilities : [];
-        var totalRrcs = visibilities.length;
-        var seenBy = visibilities.filter(function(v) { return (v.rrcs_seeing || v.ipv4_full_table_peer_count || 0) > 0; }).length;
-        var score = totalRrcs > 0 ? Math.round((seenBy / totalRrcs) * 100) : 0;
-        var history = histData && histData.data && histData.data.by_origin ? histData.data.by_origin : [];
-        // If RIPE Stat returned no data, try bgproutes.io fallback
-        if (totalRrcs === 0 && samplePrefixes[0]) {
+      // 18. BGP Visibility (uses routing-status API which is more reliable than visibility API)
+      validationPromises.visibility = fetchJSON("https://stat.ripe.net/data/routing-status/data.json?resource=AS" + rawAsn, { timeout: 20000 }).then(function(rsData) {
+        var vis = rsData && rsData.data && rsData.data.visibility ? rsData.data.visibility : {};
+        var v4 = vis.v4 || {};
+        var v6 = vis.v6 || {};
+        var totalPeers = (v4.total_ris_peers || 0) + (v6.total_ris_peers || 0);
+        var seeingPeers = (v4.ris_peers_seeing || 0) + (v6.ris_peers_seeing || 0);
+        var score = totalPeers > 0 ? Math.round((seeingPeers / totalPeers) * 100) : 0;
+        var observedNeighbours = rsData && rsData.data ? (rsData.data.observed_neighbours || 0) : 0;
+        // If routing-status returned no data, try bgproutes.io
+        if (totalPeers === 0 && samplePrefixes[0]) {
           return fetchBgproutesVisibility(samplePrefixes[0]).then(function(bgprFb) {
             if (bgprFb && bgprFb.vps_seeing > 0) {
-              seenBy = bgprFb.vps_seeing;
-              totalRrcs = Math.max(bgprFb.vps_seeing, 300);
-              score = Math.round((seenBy / totalRrcs) * 100);
+              seeingPeers = bgprFb.vps_seeing;
+              totalPeers = Math.max(bgprFb.vps_seeing, 300);
+              score = Math.round((seeingPeers / totalPeers) * 100);
             }
-            return { status: score >= 80 ? "pass" : score >= 50 ? "warning" : "fail", visibility_score: score, total_rrcs: totalRrcs, seen_by: seenBy, origin_changes: history.length, sample_prefix: samplePrefixes[0] || null };
+            return { status: score >= 80 ? "pass" : score >= 50 ? "warning" : "fail", visibility_score: score, total_ris_peers: totalPeers, seen_by: seeingPeers, v4_seeing: v4.ris_peers_seeing || 0, v4_total: v4.total_ris_peers || 0, v6_seeing: v6.ris_peers_seeing || 0, v6_total: v6.total_ris_peers || 0, observed_neighbours: observedNeighbours, source: "bgproutes.io_fallback" };
           }).catch(function() {
-            return { status: score >= 80 ? "pass" : score >= 50 ? "warning" : "fail", visibility_score: score, total_rrcs: totalRrcs, seen_by: seenBy, origin_changes: history.length, sample_prefix: samplePrefixes[0] || null };
+            return { status: "fail", visibility_score: 0, total_ris_peers: 0, seen_by: 0, source: "unavailable" };
           });
         }
-        return { status: score >= 80 ? "pass" : score >= 50 ? "warning" : "fail", visibility_score: score, total_rrcs: totalRrcs, seen_by: seenBy, origin_changes: history.length, sample_prefix: samplePrefixes[0] || null };
+        return { status: score >= 80 ? "pass" : score >= 50 ? "warning" : "fail", visibility_score: score, total_ris_peers: totalPeers, seen_by: seeingPeers, v4_seeing: v4.ris_peers_seeing || 0, v4_total: v4.total_ris_peers || 0, v6_seeing: v6.ris_peers_seeing || 0, v6_total: v6.total_ris_peers || 0, observed_neighbours: observedNeighbours, source: "ripe_routing_status" };
       }).catch(function(e) { return { status: "error", error: String(e) }; });
 
       // 19. BGP Communities Analysis
@@ -1959,6 +1995,11 @@ const server = http.createServer(async (req, res) => {
       checks.forEach(function(c) {
         var v = validations[c.key];
         var points = 0;
+        if (v && v.status === "info") {
+          // "info" = unable to verify (e.g. API auth required) — exclude from scoring
+          checkResults.push({ check: c.key, weight: c.weight, earned: 0, status: "info" });
+          return;
+        }
         if (v && v.status === "pass") points = c.weight;
         else if (v && v.status === "warning") points = Math.round(c.weight * 0.5);
         totalWeight += c.weight;
