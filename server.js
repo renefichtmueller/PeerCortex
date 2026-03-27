@@ -1739,9 +1739,10 @@ const server = http.createServer(async (req, res) => {
         return { status: score >= 50 ? "pass" : "warning", participant: true, score: score, details: data };
       }).catch(function(e) { return { status: "info", participant: "unknown", message: "MANRS check unavailable", note: "https://observatory.manrs.org/asn/" + rawAsn }; });
 
-      // 17. Reverse DNS Coverage
+      // 17. Reverse DNS Coverage (sample up to 20 prefixes for better coverage)
+      var rdnsSampleSize = Math.min(20, samplePrefixes.length);
       validationPromises.rdns = Promise.all(
-        samplePrefixes.slice(0, 5).map(function(pfx) {
+        samplePrefixes.slice(0, rdnsSampleSize).map(function(pfx) {
           return fetchJSON("https://stat.ripe.net/data/reverse-dns-consistency/data.json?resource=" + encodeURIComponent(pfx), { timeout: 15000 }).then(function(data) {
             var pfxData = data && data.data && data.data.prefixes ? data.data.prefixes : {};
             var hasDelegation = false;
@@ -1878,7 +1879,8 @@ const server = http.createServer(async (req, res) => {
       })();
 
       // 22. IXP Route Server Participation (Bug 5 fix: fair scoring for bilateral peering)
-      var ixRsQueryUrl = netId ? "/netixlan?net_id=" + netId : "/netixlan?asn=" + rawAsn;
+      // Always use asn= for netixlan (more reliable than net_id when PDB rate-limits)
+      var ixRsQueryUrl = "/netixlan?asn=" + rawAsn;
       {
         validationPromises.ix_route_server = fetchPeeringDB(ixRsQueryUrl).then(function(ixData) {
           var connections = ixData && ixData.data ? ixData.data : [];
@@ -1891,19 +1893,19 @@ const server = http.createServer(async (req, res) => {
           if (totalIx > 0 && rsCount > 0) {
             // Using route servers - good
             status = "pass";
-            note = null;
-          } else if (totalIx >= 20 && rsCount === 0) {
-            // Large network with 20+ IX connections but no RS = deliberate bilateral peering policy
+            note = rsCount + " of " + totalIx + " IX connections use route servers (" + rsPct + "%)";
+          } else if (totalIx >= 10 && rsCount === 0) {
+            // Network with 10+ IX connections but no RS = deliberate bilateral peering policy
             status = "pass";
-            note = "Bilateral peering policy - " + totalIx + " IX connections without route servers indicates deliberate policy choice";
-          } else if (totalIx < 5 && rsCount === 0) {
-            // Small number of IX connections and no RS - suggests misconfiguration
+            note = "Bilateral peering policy — " + totalIx + " IX connections, all bilateral (no route server usage)";
+          } else if (totalIx < 3 && rsCount === 0) {
+            // Very small IX presence and no RS
             status = "warning";
-            note = "Only " + totalIx + " IX connections and no route server usage - consider enabling route server peering for better reachability";
+            note = "Only " + totalIx + " IX connection(s) and no route server usage";
           } else {
-            // Medium network (5-19 IX) without RS - mild warning
-            status = "warning";
-            note = totalIx + " IX connections without route server usage";
+            // Small-medium network (3-9 IX) without RS - informational
+            status = "info";
+            note = totalIx + " IX connections without route server usage — consider enabling RS for broader reachability";
           }
 
           return { status: status, total_ix_connections: totalIx, rs_peer_count: rsCount, rs_peer_pct: rsPct, note: note };
