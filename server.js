@@ -931,12 +931,7 @@ async function fetchWhois(resource) {
 // ============================================================
 
 const server = http.createServer(async (req, res) => {
-  res.setHeader("Access-Control-Allow-Origin", "https://peercortex.org");
-  res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains; preload");
-  res.setHeader("X-Content-Type-Options", "nosniff");
-  res.setHeader("X-Frame-Options", "DENY");
-  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
-  res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+  res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
@@ -1847,8 +1842,9 @@ const server = http.createServer(async (req, res) => {
       })();
 
       // 22. IXP Route Server Participation (Bug 5 fix: fair scoring for bilateral peering)
-      if (netId) {
-        validationPromises.ix_route_server = fetchPeeringDB("/netixlan?net_id=" + netId).then(function(ixData) {
+      var ixRsQueryUrl = netId ? "/netixlan?net_id=" + netId : "/netixlan?asn=" + rawAsn;
+      {
+        validationPromises.ix_route_server = fetchPeeringDB(ixRsQueryUrl).then(function(ixData) {
           var connections = ixData && ixData.data ? ixData.data : [];
           var rsParticipants = connections.filter(function(c) { return c.is_rs_peer === true; });
           var totalIx = connections.length;
@@ -1876,8 +1872,6 @@ const server = http.createServer(async (req, res) => {
 
           return { status: status, total_ix_connections: totalIx, rs_peer_count: rsCount, rs_peer_pct: rsPct, note: note };
         }).catch(function(e) { return { status: "error", error: String(e) }; });
-      } else {
-        validationPromises.ix_route_server = Promise.resolve({ status: "warning", message: "No PeeringDB record found" });
       }
 
       // 23. Resource Certification (local RPKI validation - all prefixes, all RIRs)
@@ -1925,9 +1919,14 @@ const server = http.createServer(async (req, res) => {
         // Detect global/anycast networks: 5+ facility countries OR Content/NSP type
         var netInfoType = (net.info_type || "").toLowerCase();
         var isGlobalNetwork = facCountryCount >= 5 || netInfoType === "content" || netInfoType === "nsp";
-        if (isGlobalNetwork && mismatches.length > 0) {
+        if (isGlobalNetwork) {
+          // Global/anycast/CDN network: geo mismatches are expected, not anomalies
           validations.geolocation.status = "pass";
-          validations.geolocation.note = "Global/anycast network - multi-country presence expected (" + facCountryCount + " facility countries, type: " + (net.info_type || "N/A") + ")";
+          if (geoCountryCount === 0) {
+            validations.geolocation.note = "Global network (" + facCountryCount + " countries, type: " + (net.info_type || "N/A") + ") - no MaxMind geolocation data available";
+          } else {
+            validations.geolocation.note = "Global/anycast network - multi-country presence expected (" + facCountryCount + " facility countries, type: " + (net.info_type || "N/A") + ")";
+          }
           validations.geolocation.country_mismatches = [];
         } else if (facCountryCount <= 2 && geoCountryCount >= 10) {
           // Actual anomaly: small network appearing in many countries
