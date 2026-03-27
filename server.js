@@ -2083,12 +2083,10 @@ const server = http.createServer(async (req, res) => {
       // Phase 1: ALL calls in parallel — RIPE Stat + PDB IX/Fac + Atlas + bgp.he.net
       // IX/Fac: use net_id when available (canonical), fall back to asn/local_asn filter
       // &limit=1000 prevents truncation for large networks (default PeeringDB limit is 250)
+      // netixlan supports asn= filter as fallback; netfac requires net_id (local_asn= is not a valid filter)
       const ixQuery = netId
         ? "/netixlan?net_id=" + netId + "&limit=1000"
         : "/netixlan?asn=" + asn + "&limit=1000";
-      const facQuery = netId
-        ? "/netfac?net_id=" + netId + "&limit=1000"
-        : "/netfac?local_asn=" + asn + "&limit=1000";
       const promises = [
         fetchJSONWithRetry("https://stat.ripe.net/data/announced-prefixes/data.json?resource=AS" + asn, { timeout: 30000 }),
         fetchJSONWithRetry("https://stat.ripe.net/data/asn-neighbours/data.json?resource=AS" + asn, { timeout: 30000 }),
@@ -2099,7 +2097,7 @@ const server = http.createServer(async (req, res) => {
         fetchJSON("https://stat.ripe.net/data/visibility/data.json?resource=AS" + asn, { timeout: 30000 }),
         fetchJSON("https://stat.ripe.net/data/prefix-size-distribution/data.json?resource=AS" + asn),
         fetchPeeringDBWithRetry(ixQuery),
-        fetchPeeringDBWithRetry(facQuery),
+        netId ? fetchPeeringDBWithRetry("/netfac?net_id=" + netId + "&limit=1000") : Promise.resolve(null),
       ];
       const [prefixData, neighbourData, overviewData, rirData, atlasProbeData, bgpHeData, visibilityData, prefixSizeData, ixlanData, facData] = await Promise.all(promises);
 
