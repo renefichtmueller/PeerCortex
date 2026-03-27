@@ -34,3 +34,4 @@ coverage/
 
 # TypeScript incremental
 *.tsbuildinfo
+ecosystem.config.js
