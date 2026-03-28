@@ -279,12 +279,16 @@ function fetchPeeringDB(path, options) {
   return fetchJSON(url, { ...options, headers: { ...(options && options.headers || {}), ...headers } });
 }
 
-// PeeringDB fetch with one retry on failure (handles transient rate-limits)
+// PeeringDB fetch with exponential backoff retries (handles rate-limits under concurrent load).
+// Up to 3 attempts: immediate → 2s → 5s. Returns null only after all attempts exhausted.
 async function fetchPeeringDBWithRetry(path, options) {
-  const result = await fetchPeeringDB(path, options);
-  if (result !== null) return result;
-  await new Promise(r => setTimeout(r, 1500));
-  return fetchPeeringDB(path, options);
+  const delays = [2000, 5000];
+  let result = await fetchPeeringDB(path, options);
+  for (let i = 0; i < delays.length && result === null; i++) {
+    await new Promise(r => setTimeout(r, delays[i]));
+    result = await fetchPeeringDB(path, options);
+  }
+  return result;
 }
 
 // Generic JSON fetch with one retry — for sources that occasionally fail under load (RIPE Stat, Atlas)

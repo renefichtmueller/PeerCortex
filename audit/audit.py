@@ -414,7 +414,13 @@ def main():
 
     results = []
     with ThreadPoolExecutor(max_workers=CONCURRENCY) as pool:
-        futures = {pool.submit(_audit_asn, asn): asn for asn in batch}
+        # Stagger submissions by 2s so PeerCortex's internal PDB requests
+        # don't all fire simultaneously (9+ concurrent PDB calls → rate limit).
+        futures = {}
+        for idx, asn in enumerate(batch):
+            if idx > 0:
+                time.sleep(2)
+            futures[pool.submit(_audit_asn, asn)] = asn
         for i, future in enumerate(as_completed(futures), 1):
             asn = futures[future]
             try:
