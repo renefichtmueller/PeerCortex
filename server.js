@@ -80,7 +80,7 @@ function cacheSet(key, data, ttlMs) {
 }
 
 const CACHE_TTL_LOOKUP = 5 * 60 * 1000;   // 5 minutes
-const CACHE_TTL_ASPA = 10 * 60 * 1000;    // 10 minutes
+const CACHE_TTL_ASPA = 4 * 60 * 60 * 1000;    // 4 hours
 const CACHE_TTL_NEWS = 10 * 60 * 1000;    // 10 minutes
 const CACHE_TTL_DEFAULT = 5 * 60 * 1000;  // 5 minutes
 
@@ -252,7 +252,7 @@ function fetchRpkiAspaFeed() {
 
 // Ensure ASPA cache is fresh (fetch if older than 10 minutes)
 async function ensureAspaCache() {
-  if (Date.now() - rpkiAspaLastFetch > 10 * 60 * 1000) {
+  if (Date.now() - rpkiAspaLastFetch > 4 * 60 * 60 * 1000) {
     await fetchRpkiAspaFeed();
   }
 }
@@ -3103,9 +3103,9 @@ Promise.all([fetchRpkiAspaFeed(), fetchAllAtlasProbes(), fetchPdbOrgCountries()]
 // Refresh RPKI ASPA cache every 10 minutes
 setInterval(() => {
   fetchRpkiAspaFeed();
-}, 10 * 60 * 1000);
+}, 4 * 60 * 60 * 1000);
 
-// Refresh Atlas probe cache every hour
+// Refresh Atlas probe cache every 12 hours
 setInterval(function() {
   fetchAllAtlasProbes();
-}, 60 * 60 * 1000);
+}, 12 * 60 * 60 * 1000);
