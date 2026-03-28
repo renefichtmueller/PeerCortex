@@ -51,7 +51,8 @@ RIPE_BASE      = "https://stat.ripe.net/data"
 BATCH_SIZE     = 100
 TIMEOUT_PC     = 90    # large networks (Cloudflare, Amazon) can take 60–80s
 TIMEOUT_AUTH   = 30
-CONCURRENCY    = 4     # parallel PeerCortex requests
+CONCURRENCY    = 3     # parallel PeerCortex requests — keep low to avoid PDB hammering
+                       # (each PC lookup triggers 3+ PDB calls internally)
 
 # Tolerance for prefix/neighbour counts (BGP timing differences are normal)
 PREFIX_TOL_PCT = 0.05   # 5%
