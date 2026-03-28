@@ -967,8 +967,14 @@ const server = http.createServer(async (req, res) => {
     return res.end();
   }
 
-  const url = new URL(req.url, "http://localhost");
-  const reqPath = url.pathname;
+  let url, reqPath;
+  try {
+    url = new URL(req.url, "http://localhost");
+    reqPath = url.pathname;
+  } catch (_urlErr) {
+    res.writeHead(400);
+    return res.end("Bad Request");
+  }
 
   // Serve static files
   if (reqPath === "/" || reqPath === "/index.html") {
