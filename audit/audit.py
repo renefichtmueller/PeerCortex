@@ -100,11 +100,19 @@ def _fetch(url, timeout=30, headers=None):
     except Exception:
         return None
 
-def _fetch_pdb(path, timeout=30):
+def _fetch_pdb(path, timeout=30, retries=2):
+    """Fetch PeeringDB with API key and retry on 429 / failures."""
     headers = {}
     if PEERINGDB_KEY:
         headers["Authorization"] = "Api-Key " + PEERINGDB_KEY
-    return _fetch(PDB_BASE + path, timeout=timeout, headers=headers)
+    url = PDB_BASE + path
+    for attempt in range(retries + 1):
+        result = _fetch(url, timeout=timeout, headers=headers)
+        if result is not None:
+            return result
+        if attempt < retries:
+            time.sleep(1.5 * (attempt + 1))   # 1.5s, 3s backoff
+    return None
 
 def _fetch_ripe(endpoint, asn, timeout=30):
     url = f"{RIPE_BASE}/{endpoint}/data.json?resource=AS{asn}"
@@ -129,7 +137,7 @@ def _today():
     return datetime.date.today().isoformat()
 
 def _now_iso():
-    return datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+    return datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 # ─── Batch selection (priority: errors > never audited > oldest) ──────────────
 def _select_batch(reg, batch_size):
@@ -167,8 +175,13 @@ def _select_batch(reg, batch_size):
 # ─── Authoritative data fetch ─────────────────────────────────────────────────
 def _fetch_auth(asn):
     """Fetch authoritative data for one ASN from RIPE Stat + PeeringDB."""
-    # PeeringDB net lookup first (need net_id for IX/fac queries)
+    # PeeringDB net lookup first (need net_id for IX/fac queries).
+    # IMPORTANT: distinguish between:
+    #   pdb_net is None          → fetch FAILED (rate limit / timeout) → pdb_present=unknown
+    #   pdb_net["data"] == []    → ASN genuinely NOT in PeeringDB
+    #   pdb_net["data"][0].id    → ASN IS in PeeringDB, use net_id
     pdb_net = _fetch_pdb(f"/net?asn={asn}", timeout=TIMEOUT_AUTH)
+    pdb_fetch_ok = pdb_net is not None
     net     = ((pdb_net or {}).get("data") or [{}])[0]
     net_id  = net.get("id")
 
@@ -209,13 +222,16 @@ def _fetch_auth(asn):
     fac_count  = len(fac_list)
 
     return {
-        "pdb_id":      net_id,
-        "pdb_present": bool(net_id),
+        "pdb_id":        net_id,
+        # pdb_present: True only when we CONFIRMED the ASN is in PeeringDB (got data[0].id).
+        # False only when PeeringDB confirmed the ASN is NOT in PDB (data=[]).
+        # None when fetch failed — IX/fac discrepancies are not counted as PC errors.
+        "pdb_present":   True if net_id else (False if pdb_fetch_ok else None),
         "v4": v4,  "v6": v6,
         "ix": ix_unique,  "fac": fac_count,
         "up": up,  "dn": dn,
-        "ripe_ok": ripe_pfx is not None,
-        "pdb_ok":  pdb_net  is not None,
+        "ripe_ok":       ripe_pfx is not None,
+        "pdb_ok":        pdb_fetch_ok,
     }
 
 # ─── Field comparison ─────────────────────────────────────────────────────────
@@ -238,12 +254,12 @@ def _compare(asn, auth, pc):
     failures = []
     pdb_absent = not auth["pdb_present"]
 
-    pc_v4  = (pc.get("prefixes")  or {}).get("ipv4")
-    pc_v6  = (pc.get("prefixes")  or {}).get("ipv6")
-    pc_ix  = (pc.get("ix_presence") or {}).get("unique_ixps")
-    pc_fac = (pc.get("facilities")  or {}).get("total")
-    pc_up  = (pc.get("neighbours")  or {}).get("upstream_count")
-    pc_dn  = (pc.get("neighbours")  or {}).get("downstream_count")
+    pc_v4  = (pc.get("prefixes")     or {}).get("ipv4")
+    pc_v6  = (pc.get("prefixes")     or {}).get("ipv6")
+    pc_ix  = (pc.get("ix_presence")  or {}).get("unique_ixps")
+    pc_fac = (pc.get("facilities")   or {}).get("total")
+    pc_up  = (pc.get("neighbours")   or {}).get("upstream_count")
+    pc_dn  = (pc.get("neighbours")   or {}).get("downstream_count")
 
     if not _ok(auth["v4"], pc_v4):
         failures.append({"field": "Prefixes v4", "auth": auth["v4"], "pc": pc_v4,
@@ -252,8 +268,9 @@ def _compare(asn, auth, pc):
         failures.append({"field": "Prefixes v6", "auth": auth["v6"], "pc": pc_v6,
                          "delta": abs(auth["v6"] - (pc_v6 or 0))})
 
-    # IXP / facility — only meaningful when ASN is in PeeringDB
-    if not pdb_absent:
+    # IXP / facility — only check when auth CONFIRMED ASN is in PeeringDB.
+    # pdb_present=None means our fetch failed → skip to avoid false positives.
+    if auth["pdb_present"] is True:
         if auth["ix"] != pc_ix:
             failures.append({"field": "IXPs", "auth": auth["ix"], "pc": pc_ix,
                              "delta": abs(auth["ix"] - (pc_ix or 0))})
@@ -283,14 +300,19 @@ def _audit_asn(asn):
         pc = _fetch_pc(asn, timeout=TIMEOUT_PC)
 
     failures = _compare(asn, auth, pc)
+    # pdb_present=False  → confirmed NOT in PDB  → "[no PDB — correct]"
+    # pdb_present=None   → fetch failed           → "[PDB fetch failed]"
+    # pdb_present=True   → confirmed in PDB
+    pdb_state = auth["pdb_present"]
     return {
-        "asn":        asn,
-        "auth":       auth,
-        "pc_name":    ((pc or {}).get("network") or {}).get("name", ""),
-        "pc_ok":      pc is not None,
-        "pdb_absent": not auth["pdb_present"],
-        "failures":   failures,
-        "passed":     len(failures) == 0,
+        "asn":         asn,
+        "auth":        auth,
+        "pc_name":     ((pc or {}).get("network") or {}).get("name", ""),
+        "pc_ok":       pc is not None,
+        "pdb_absent":  pdb_state is False,    # confirmed not in PDB
+        "pdb_unknown": pdb_state is None,     # fetch error — skip IX/fac check
+        "failures":    failures,
+        "passed":      len(failures) == 0,
     }
 
 # ─── Main ─────────────────────────────────────────────────────────────────────
@@ -322,7 +344,12 @@ def main():
                 r = future.result()
                 results.append(r)
                 status    = "✓" if r["passed"] else f"✗ {len(r['failures'])}"
-                pdb_note  = "  [no PDB — correct]" if r["pdb_absent"] else ""
+                if r.get("pdb_absent"):
+                    pdb_note = "  [no PDB — correct]"
+                elif r.get("pdb_unknown"):
+                    pdb_note = "  [PDB fetch failed — IX/fac skipped]"
+                else:
+                    pdb_note = ""
                 fail_note = ""
                 if r["failures"] and r["failures"][0].get("field") != "TIMEOUT":
                     top = r["failures"][0]
@@ -344,7 +371,9 @@ def main():
             "peeringdb_absent": False, "last_audited": None,
         })
         entry["last_audited"] = date
-        entry["peeringdb_absent"] = r["pdb_absent"]
+        # Only update peeringdb_absent when we have a confirmed answer
+        if not r.get("pdb_unknown"):
+            entry["peeringdb_absent"] = r.get("pdb_absent", False)
 
         if r["passed"]:
             entry["pass_count"]         = entry.get("pass_count", 0) + 1
@@ -362,11 +391,12 @@ def main():
         if auth.get("pdb_id"):
             entry["peeringdb_id"] = auth["pdb_id"]
 
-    total    = len(results)
-    passed   = sum(1 for r in results if r["passed"])
-    failed   = total - passed
-    no_pdb   = sum(1 for r in results if r["pdb_absent"])
-    accuracy = round(passed / total * 100) if total else 0
+    total      = len(results)
+    passed     = sum(1 for r in results if r["passed"])
+    failed     = total - passed
+    no_pdb     = sum(1 for r in results if r.get("pdb_absent"))
+    pdb_fail   = sum(1 for r in results if r.get("pdb_unknown"))
+    accuracy   = round(passed / total * 100) if total else 0
 
     reg["meta"]["last_run"]          = run_ts
     reg["meta"]["last_accuracy_pct"] = accuracy
@@ -397,7 +427,8 @@ def main():
         f"  Audited : {total} ASNs",
         f"  Passed  : {passed}  ({accuracy}%)",
         f"  Failed  : {failed}",
-        f"  No PDB  : {no_pdb}  (fac=0 ix=0 is CORRECT for these — not an error)",
+        f"  No PDB  : {no_pdb}  (fac=0 ix=0 is CORRECT — not an error)",
+        f"  PDB err : {pdb_fail}  (IX/fac skipped — PDB fetch failed, will retry next run)",
         f"  PDB Key : {'Active (no rate limits)' if PEERINGDB_KEY else 'MISSING — configure PEERINGDB_API_KEY!'}",
     ]
     if trend:
