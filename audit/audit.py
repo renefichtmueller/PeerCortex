@@ -315,6 +315,82 @@ def _audit_asn(asn):
         "passed":      len(failures) == 0,
     }
 
+# ─── Known issue tracking ────────────────────────────────────────────────────
+def _issue_description(field, auth_val, pc_val):
+    """Generate a human-readable description of the data discrepancy."""
+    if field == "TIMEOUT":
+        return "PeerCortex did not respond within timeout — server may be overloaded"
+    if auth_val is not None and pc_val is not None:
+        if auth_val > 0 and (pc_val or 0) == 0:
+            return (
+                f"PeerCortex returns 0 but authoritative source shows {auth_val}. "
+                f"Likely cause: PeeringDB lookup failing in server.js for this ASN "
+                f"(net_id resolution or netixlan/netfac query failing)."
+            )
+        if (auth_val or 0) == 0 and pc_val > 0:
+            return (
+                f"PeerCortex returns {pc_val} but authoritative source shows 0. "
+                f"Likely cause: PeerCortex using stale cached data or querying wrong endpoint."
+            )
+        delta = abs(auth_val - pc_val)
+        pct   = round(delta / max(auth_val, 1) * 100)
+        return (
+            f"Mismatch: PeerCortex={pc_val}, authoritative={auth_val} "
+            f"(delta={delta}, {pct}% off). Exceeds tolerance."
+        )
+    return f"Comparison not possible (auth={auth_val}, pc={pc_val})"
+
+
+def _update_known_issues(entry, failures, date):
+    """
+    Update the known_issues dict for an ASN registry entry.
+
+    A known issue is created when the same field fails in 2+ consecutive runs.
+    It stays open (status='open') until the field passes in a future run.
+    When the ASN fully passes, all known_issues are cleared in the caller.
+    """
+    if not failures:
+        return
+
+    # Only promote to known_issue after 2+ consecutive failures
+    # (consecutive_errors was already incremented by caller)
+    if entry.get("consecutive_errors", 0) < 2:
+        return
+
+    known = entry.setdefault("known_issues", {})
+    failing_fields = {f["field"] for f in failures if f.get("field") not in ("TIMEOUT", "EXCEPTION")}
+
+    for f in failures:
+        field = f.get("field")
+        if not field or field in ("TIMEOUT", "EXCEPTION"):
+            continue
+        if field in known:
+            # Update existing issue
+            known[field]["last_seen"]    = date
+            known[field]["occurrences"]  = known[field].get("occurrences", 1) + 1
+            known[field]["last_auth"]    = f.get("auth")
+            known[field]["last_pc"]      = f.get("pc")
+            known[field]["description"]  = _issue_description(field, f.get("auth"), f.get("pc"))
+        else:
+            # Create new known issue
+            known[field] = {
+                "field":       field,
+                "first_seen":  date,
+                "last_seen":   date,
+                "occurrences": 1,
+                "status":      "open",
+                "last_auth":   f.get("auth"),
+                "last_pc":     f.get("pc"),
+                "description": _issue_description(field, f.get("auth"), f.get("pc")),
+            }
+
+    # Clear issues for fields that are now passing (partial fix)
+    for field in list(known.keys()):
+        if field not in failing_fields:
+            known[field]["status"]    = "resolved"
+            known[field]["fixed_on"]  = date
+
+
 # ─── Main ─────────────────────────────────────────────────────────────────────
 def main():
     REPORTS_DIR.mkdir(parents=True, exist_ok=True)
@@ -379,10 +455,14 @@ def main():
             entry["pass_count"]         = entry.get("pass_count", 0) + 1
             entry["consecutive_errors"] = 0
             entry["last_status"]        = "pass"
+            # Clear all known_issues when ASN fully passes
+            entry.pop("known_issues", None)
         else:
             entry["error_count"]        = entry.get("error_count", 0) + 1
             entry["consecutive_errors"] = entry.get("consecutive_errors", 0) + 1
             entry["last_status"]        = "fail"
+            # ── Known issues: track persistent failures (2+ consecutive runs) ──
+            _update_known_issues(entry, r["failures"], date)
 
         entry["last_failures"] = r["failures"]
 
@@ -390,6 +470,8 @@ def main():
         auth = r.get("auth") or {}
         if auth.get("pdb_id"):
             entry["peeringdb_id"] = auth["pdb_id"]
+        if r.get("pc_name"):
+            entry["name"] = r["pc_name"]
 
     total      = len(results)
     passed     = sum(1 for r in results if r["passed"])
@@ -456,16 +538,51 @@ def main():
             f"  {', '.join('AS'+str(a) for a in sorted(absent_asns))}"
         )
 
+    # ── Known issues across entire registry (all ASNs, not just this batch) ───
+    all_entries  = reg["asns"]
+    open_issues  = {
+        k: v for k, v in all_entries.items()
+        if v.get("known_issues") and
+        any(i.get("status") == "open" for i in v["known_issues"].values())
+    }
+    if open_issues:
+        summary_lines.append(
+            f"\n{'!'*60}\n"
+            f"KNOWN ISSUES  ({len(open_issues)} ASNs with persistent failures)\n"
+            f"These remain until the data is correct in PeerCortex.\n"
+            f"{'!'*60}"
+        )
+        for k in sorted(open_issues, key=lambda x: int(x)):
+            v      = all_entries[k]
+            name   = v.get("name", "")
+            streak = v.get("consecutive_errors", 0)
+            issues = {fld: i for fld, i in v["known_issues"].items()
+                      if i.get("status") == "open"}
+            summary_lines.append(
+                f"\n  AS{k}  {name}"
+                f"  [OPEN — {streak} consecutive failures, "
+                f"first seen: {next(iter(issues.values()))['first_seen']}]"
+            )
+            for fld, i in issues.items():
+                summary_lines.append(f"    ▸ {fld}:")
+                summary_lines.append(f"      {i['description']}")
+                summary_lines.append(
+                    f"      auth={i['last_auth']}  pc={i['last_pc']}  "
+                    f"seen {i['occurrences']}x  last: {i['last_seen']}"
+                )
+        summary_lines.append("")
+    else:
+        summary_lines.append("\nNo persistent known issues — all data is consistent.")
+
     # Overall DB health
-    all_entries    = reg["asns"]
-    ever_failed    = sum(1 for v in all_entries.values() if v.get("error_count", 0) > 0)
-    clean_streak   = sum(1 for v in all_entries.values()
-                         if v.get("consecutive_errors", 0) == 0
-                         and v.get("last_audited"))
+    ever_failed  = sum(1 for v in all_entries.values() if v.get("error_count", 0) > 0)
+    clean_streak = sum(1 for v in all_entries.values()
+                       if v.get("consecutive_errors", 0) == 0 and v.get("last_audited"))
     summary_lines += [
         f"\nDATABASE HEALTH:",
         f"  Total tracked ASNs : {len(all_entries)}",
         f"  Clean streak       : {clean_streak} ASNs with 0 consecutive errors",
+        f"  Open known issues  : {len(open_issues)} ASNs",
         f"  Ever had errors    : {ever_failed} ASNs",
         f"\nReport: {REPORTS_DIR}/{date}.json",
     ]
@@ -486,15 +603,23 @@ def main():
         "pdb_absent":   no_pdb,
         "accuracy_pct": accuracy,
         "pdb_key_active": bool(PEERINGDB_KEY),
-        "results":      [
+        "known_issues_registry": {
+            k: v["known_issues"]
+            for k, v in all_entries.items()
+            if v.get("known_issues") and
+            any(i.get("status") == "open" for i in v["known_issues"].values())
+        },
+        "results": [
             {
-                "asn":         r["asn"],
-                "name":        r.get("pc_name", ""),
-                "pdb_absent":  r["pdb_absent"],
-                "passed":      r["passed"],
-                "failures":    r["failures"],
-                "auth":        {k: v for k, v in (r.get("auth") or {}).items()
-                                if k not in ("pdb_ok", "ripe_ok")},
+                "asn":          r["asn"],
+                "name":         r.get("pc_name", ""),
+                "pdb_absent":   r.get("pdb_absent", False),
+                "pdb_unknown":  r.get("pdb_unknown", False),
+                "passed":       r["passed"],
+                "failures":     r["failures"],
+                "known_issues": all_entries.get(str(r["asn"]), {}).get("known_issues"),
+                "auth":         {fk: fv for fk, fv in (r.get("auth") or {}).items()
+                                 if fk not in ("pdb_ok", "ripe_ok")},
             }
             for r in results
         ],
