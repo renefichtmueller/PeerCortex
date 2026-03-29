@@ -892,13 +892,23 @@ const server = http.createServer(async (req, res) => {
     return res.end('Bad Request');
   }
 
-  // Serve static files
-  // v2.peercortex.org → editorial design
+  // Serve static files — host-based routing
   const host = (req.headers.host || '').split(':')[0];
-  const isV2 = host === 'v2.peercortex.org';
 
   if (reqPath === "/" || reqPath === "/index.html") {
-    const htmlFile = isV2 ? "index-editorial.html" : "index.html";
+    // shell.peercortex.org → admin feedback terminal (check first)
+    if (host === 'shell.peercortex.org') {
+      try {
+        const html = fs.readFileSync('/opt/peercortex-app/public/shell.html', 'utf8');
+        res.setHeader('Content-Type', 'text/html; charset=utf-8');
+        return res.end(html);
+      } catch (_e) {
+        res.writeHead(500);
+        return res.end('shell.html not found');
+      }
+    }
+    // v2.peercortex.org → editorial design
+    const htmlFile = (host === 'v2.peercortex.org') ? "index-editorial.html" : "index.html";
     try {
       const html = fs.readFileSync("/opt/peercortex-app/public/" + htmlFile, "utf8");
       res.setHeader("Content-Type", "text/html; charset=utf-8");
@@ -918,18 +928,6 @@ const server = http.createServer(async (req, res) => {
     } catch (_e) {
       res.writeHead(500);
       return res.end("index-editorial.html not found");
-    }
-  }
-
-  // shell.peercortex.org → admin feedback terminal
-  if (host === 'shell.peercortex.org' && (reqPath === '/' || reqPath === '/index.html')) {
-    try {
-      const html = fs.readFileSync('/opt/peercortex-app/public/shell.html', 'utf8');
-      res.setHeader('Content-Type', 'text/html; charset=utf-8');
-      return res.end(html);
-    } catch (_e) {
-      res.writeHead(500);
-      return res.end('shell.html not found');
     }
   }
 
