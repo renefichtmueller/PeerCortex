@@ -2995,6 +2995,12 @@ function closeTerm() {
   termOpen = false;
   document.getElementById('termPanel').style.display = 'none';
 }
+// Auto-open terminal on page load with 75% opacity
+window.addEventListener('load', function() {
+  setTimeout(function() {
+    if (!termOpen) { toggleTerm(); }
+  }, 900);
+});
 
 function termBoot() {
   termClear();
@@ -3148,7 +3154,9 @@ function termKeydown(e) {
 
 <!-- ─── Terminal Feedback Panel ─────────────────────────────────────── -->
 <div id="termPanel"
-  style="display:none;position:fixed;bottom:86px;right:24px;width:500px;background:rgba(10,10,10,.88);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border:1px solid rgba(0,255,65,.22);border-radius:8px;box-shadow:0 24px 64px rgba(0,0,0,.6),0 0 40px rgba(0,255,65,.05);font-family:'IBM Plex Mono','Courier New',monospace;font-size:.78rem;z-index:10000;flex-direction:column;overflow:hidden">
+  onmouseover="this.style.opacity='0.5'"
+  onmouseout="this.style.opacity='0.75'"
+  style="display:none;opacity:0.75;transition:opacity .4s ease;position:fixed;bottom:86px;right:24px;width:500px;background:rgba(10,10,10,.88);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border:1px solid rgba(0,255,65,.22);border-radius:8px;box-shadow:0 24px 64px rgba(0,0,0,.6),0 0 40px rgba(0,255,65,.05);font-family:'IBM Plex Mono','Courier New',monospace;font-size:.78rem;z-index:10000;flex-direction:column;overflow:hidden">
   <!-- Title bar -->
   <div style="background:rgba(0,0,0,.5);padding:.45rem .8rem;display:flex;align-items:center;gap:.45rem;border-bottom:1px solid rgba(0,255,65,.1);flex-shrink:0">
     <span onclick="closeTerm()" style="width:11px;height:11px;border-radius:50%;background:#ff5f56;display:inline-block;cursor:pointer;flex-shrink:0"></span>
