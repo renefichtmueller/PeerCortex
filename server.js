@@ -890,14 +890,31 @@ const server = http.createServer(async (req, res) => {
   }
 
   // Serve static files
+  // v2.peercortex.org → editorial design
+  const host = (req.headers.host || '').split(':')[0];
+  const isV2 = host === 'v2.peercortex.org';
+
   if (reqPath === "/" || reqPath === "/index.html") {
+    const htmlFile = isV2 ? "index-editorial.html" : "index.html";
     try {
-      const html = fs.readFileSync("/opt/peercortex-app/public/index.html", "utf8");
+      const html = fs.readFileSync("/opt/peercortex-app/public/" + htmlFile, "utf8");
       res.setHeader("Content-Type", "text/html; charset=utf-8");
       return res.end(html);
     } catch (_e) {
       res.writeHead(500);
-      return res.end("index.html not found");
+      return res.end(htmlFile + " not found");
+    }
+  }
+
+  // Direct access to editorial version
+  if (reqPath === "/index-editorial.html") {
+    try {
+      const html = fs.readFileSync("/opt/peercortex-app/public/index-editorial.html", "utf8");
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      return res.end(html);
+    } catch (_e) {
+      res.writeHead(500);
+      return res.end("index-editorial.html not found");
     }
   }
 
