@@ -3013,16 +3013,17 @@ function termBoot() {
     ' <span style="' + G + ';font-weight:600">PeerCortex Feedback Terminal</span>  <span style="' + MUT + '">v0.5.0</span>',
     '<span style="' + DIM + '">────────────────────────────────────────────</span>',
     '',
-    'Available commands:',
-    '  <span style="' + G + '">send</span>   — submit feedback or bug report',
-    '  <span style="' + G + '">help</span>   — show this menu',
-    '  <span style="' + G + '">clear</span>  — clear terminal',
-    '',
-    'Type <span style="' + G + '">send</span> and press Enter to start.',
+    'Got feedback? A bug? A wild idea?',
+    'This goes straight to the editorial team.',
     ''
   ];
   var delay = 0;
   lines.forEach(function(l) { setTimeout(function(){ termPrint(l); }, delay); delay += 35; });
+  // Auto-start wizard after boot sequence
+  var autoDelay = lines.length * 35 + 350;
+  setTimeout(function() {
+    if (termStep === 0) { termStartWizard(); }
+  }, autoDelay);
 }
 
 function termStartWizard() {
