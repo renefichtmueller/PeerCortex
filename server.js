@@ -26,6 +26,9 @@ const BGPROUTES_API_URL = process.env.BGPROUTES_API_URL || "https://api.bgproute
 const PEERINGDB_API_KEY = process.env.PEERINGDB_API_KEY || "";
 const PEERINGDB_API_URL = process.env.PEERINGDB_API_URL || "https://www.peeringdb.com/api";
 
+const FEEDBACK_TOKEN = process.env.FEEDBACK_TOKEN || "changeme-set-in-env";
+const FEEDBACK_FILE  = "/opt/peercortex-app/feedback.json";
+
 const UA = "PeerCortex/0.5.0 (+https://peercortex.org; contact: rene.fichtmueller@flexoptix.net)";
 
 // Static geocode cache for major networking cities (fallback when PDB facility coords missing)
@@ -915,6 +918,84 @@ const server = http.createServer(async (req, res) => {
     } catch (_e) {
       res.writeHead(500);
       return res.end("index-editorial.html not found");
+    }
+  }
+
+  // shell.peercortex.org → admin feedback terminal
+  if (host === 'shell.peercortex.org' && (reqPath === '/' || reqPath === '/index.html')) {
+    try {
+      const html = fs.readFileSync('/opt/peercortex-app/public/shell.html', 'utf8');
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      return res.end(html);
+    } catch (_e) {
+      res.writeHead(500);
+      return res.end('shell.html not found');
+    }
+  }
+
+  // ============================================================
+  // Feedback API
+  // ============================================================
+
+  // OPTIONS preflight (CORS)
+  if (reqPath === '/api/feedback' && req.method === 'OPTIONS') {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    res.writeHead(204);
+    return res.end();
+  }
+
+  // POST /api/feedback — submit feedback entry
+  if (reqPath === '/api/feedback' && req.method === 'POST') {
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    let body = '';
+    req.on('data', function(chunk) { body += chunk; });
+    req.on('end', function() {
+      try {
+        const data = JSON.parse(body);
+        if (!data.message || String(data.message).trim().length < 3) {
+          res.writeHead(400);
+          return res.end(JSON.stringify({ ok: false, error: 'Message too short' }));
+        }
+        const entry = {
+          id: Date.now() + '-' + Math.random().toString(36).slice(2, 7),
+          timestamp: new Date().toISOString(),
+          category: String(data.category || 'General').slice(0, 50),
+          message: String(data.message || '').slice(0, 2000),
+          name: String(data.name || 'Anonymous').slice(0, 100),
+          asn: data.asn ? String(data.asn).slice(0, 20) : null,
+          ip: req.headers['cf-connecting-ip'] || req.headers['x-forwarded-for'] || req.socket.remoteAddress || null,
+          ua: String(req.headers['user-agent'] || '').slice(0, 200)
+        };
+        let entries = [];
+        try { entries = JSON.parse(fs.readFileSync(FEEDBACK_FILE, 'utf8')); } catch (_e) { /* no file yet */ }
+        entries.push(entry);
+        fs.writeFileSync(FEEDBACK_FILE, JSON.stringify(entries, null, 2));
+        return res.end(JSON.stringify({ ok: true, id: entry.id }));
+      } catch (_e) {
+        res.writeHead(500);
+        return res.end(JSON.stringify({ ok: false, error: 'Server error' }));
+      }
+    });
+    return;
+  }
+
+  // GET /api/feedback?token=... — admin: fetch all entries as JSON
+  if (reqPath === '/api/feedback' && req.method === 'GET') {
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    const token = url.searchParams.get('token');
+    if (!token || token !== FEEDBACK_TOKEN) {
+      res.writeHead(401);
+      return res.end(JSON.stringify({ ok: false, error: 'Unauthorized' }));
+    }
+    try {
+      const entries = JSON.parse(fs.readFileSync(FEEDBACK_FILE, 'utf8'));
+      return res.end(JSON.stringify({ ok: true, entries: entries, count: entries.length }));
+    } catch (_e) {
+      return res.end(JSON.stringify({ ok: true, entries: [], count: 0 }));
     }
   }
 

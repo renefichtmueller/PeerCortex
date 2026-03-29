@@ -2954,7 +2954,217 @@ function loadPeeringRecommendations(asn, ixConnections, lookupData) {
   });
 }
 
+// ── Terminal Feedback Widget ──────────────────────────────────────────────────
+var termOpen = false;
+var termStep = 0;
+var termData  = { category:'', message:'', name:'' };
+
+// Safe DOM builder: parses only <span style="...">text</span> from trusted template strings.
+// User-supplied text is always passed via textContent — never interpreted as HTML.
+function termPrint(template, fallbackColor) {
+  var out  = document.getElementById('termOutput');
+  var line = document.createElement('div');
+  if (fallbackColor) line.style.color = fallbackColor;
+  // Split on <span> tags from our own templates
+  var parts = template.split(/(<span[^>]*>[^<]*<\/span>)/g);
+  parts.forEach(function(part) {
+    var m = part.match(/^<span([^>]*)>(.*?)<\/span>$/);
+    if (m) {
+      var span = document.createElement('span');
+      var sm = m[1].match(/style="([^"]*)"/);
+      if (sm) span.style.cssText = sm[1];
+      span.textContent = m[2]; // text content, never HTML
+      line.appendChild(span);
+    } else if (part) {
+      line.appendChild(document.createTextNode(part));
+    }
+  });
+  out.appendChild(line);
+  out.scrollTop = out.scrollHeight;
+}
+
+function termClear() { document.getElementById('termOutput').innerHTML = ''; }
+
+function toggleTerm() {
+  var p = document.getElementById('termPanel');
+  termOpen = !termOpen;
+  p.style.display = termOpen ? 'flex' : 'none';
+  if (termOpen) { termBoot(); setTimeout(function(){ document.getElementById('termInput').focus(); }, 80); }
+}
+function closeTerm() {
+  termOpen = false;
+  document.getElementById('termPanel').style.display = 'none';
+}
+
+function termBoot() {
+  termClear();
+  termStep = 0;
+  termData = { category:'', message:'', name:'' };
+  document.getElementById('termPrompt').textContent = 'peercortex:~$';
+  var G = 'color:#27c93f', DIM = 'color:rgba(0,255,65,.35)', MUT = 'color:rgba(0,255,65,.45)';
+  var lines = [
+    '<span style="' + DIM + '">────────────────────────────────────────────</span>',
+    ' <span style="' + G + ';font-weight:600">PeerCortex Feedback Terminal</span>  <span style="' + MUT + '">v0.5.0</span>',
+    '<span style="' + DIM + '">────────────────────────────────────────────</span>',
+    '',
+    'Available commands:',
+    '  <span style="' + G + '">send</span>   — submit feedback or bug report',
+    '  <span style="' + G + '">help</span>   — show this menu',
+    '  <span style="' + G + '">clear</span>  — clear terminal',
+    '',
+    'Type <span style="' + G + '">send</span> and press Enter to start.',
+    ''
+  ];
+  var delay = 0;
+  lines.forEach(function(l) { setTimeout(function(){ termPrint(l); }, delay); delay += 35; });
+}
+
+function termStartWizard() {
+  var G = 'color:#27c93f';
+  termStep = 1;
+  document.getElementById('termPrompt').textContent = '>';
+  termPrint('');
+  termPrint('Select category:');
+  termPrint('  <span style="' + G + '">1</span>  Bug Report');
+  termPrint('  <span style="' + G + '">2</span>  Feature Request');
+  termPrint('  <span style="' + G + '">3</span>  Design Feedback');
+  termPrint('  <span style="' + G + '">4</span>  General');
+  termPrint('');
+}
+
+function termKeydown(e) {
+  if (e.key !== 'Enter') return;
+  var inp    = document.getElementById('termInput');
+  var val    = inp.value.trim();
+  inp.value  = '';
+  var prompt = document.getElementById('termPrompt').textContent;
+  var G = 'color:#27c93f', Y = 'color:#ffbd2e', MUT = 'color:rgba(0,255,65,.4)';
+  // Echo: prompt + user text (built with DOM — no injection risk)
+  (function(){
+    var out = document.getElementById('termOutput');
+    var d   = document.createElement('div');
+    var sp  = document.createElement('span');
+    sp.style.color = 'rgba(0,255,65,.4)';
+    sp.textContent = prompt;
+    d.appendChild(sp);
+    d.appendChild(document.createTextNode(' ' + val));
+    out.appendChild(d);
+    out.scrollTop = out.scrollHeight;
+  })();
+
+  if (termStep === 0) {
+    var cmd = val.toLowerCase();
+    if (cmd === 'send')       { termStartWizard(); }
+    else if (cmd === 'help')  { termBoot(); }
+    else if (cmd === 'clear') { termClear(); }
+    else if (cmd !== '') {
+      var out2 = document.getElementById('termOutput');
+      var err  = document.createElement('div');
+      err.style.color = 'rgba(255,100,100,.75)';
+      err.textContent = 'bash: ' + val + ': command not found';
+      out2.appendChild(err);
+      out2.scrollTop = out2.scrollHeight;
+    }
+  } else if (termStep === 1) {
+    var cats = {'1':'Bug Report','2':'Feature Request','3':'Design Feedback','4':'General'};
+    if (cats[val]) {
+      termData.category = cats[val];
+      termPrint('');
+      termPrint('<span style="' + G + '">✓</span> Category: <span style="' + Y + '">' + cats[val] + '</span>');
+      termPrint('');
+      termPrint('Describe the issue or idea:');
+      termStep = 2;
+      document.getElementById('termPrompt').textContent = '>';
+    } else { termPrint('Enter 1, 2, 3, or 4.', 'rgba(255,189,46,.8)'); }
+
+  } else if (termStep === 2) {
+    if (val.length < 5) {
+      termPrint('Too short — write at least a few words.', 'rgba(255,189,46,.8)');
+    } else {
+      termData.message = val;
+      termPrint('');
+      termPrint('<span style="' + G + '">✓</span> Message recorded.');
+      termPrint('');
+      termPrint('Your name or handle: <span style="' + MUT + '">(press Enter to stay Anonymous)</span>');
+      termStep = 3;
+    }
+
+  } else if (termStep === 3) {
+    termData.name = val || 'Anonymous';
+    termStep = 0;
+    document.getElementById('termPrompt').textContent = 'peercortex:~$';
+    termPrint('');
+    termPrint('<span style="' + G + '">Transmitting report...</span>');
+    fetch('/api/feedback', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ category: termData.category, message: termData.message, name: termData.name, asn: currentAsn || null })
+    }).then(function(r){ return r.json(); }).then(function(d){
+      if (d.ok) {
+        termPrint('');
+        termPrint('<span style="' + G + '">████████████████████</span> 100%');
+        termPrint('');
+        (function(){
+          var out3 = document.getElementById('termOutput');
+          var ok   = document.createElement('div');
+          ok.style.color = '#27c93f';
+          ok.textContent = '✓ Feedback transmitted. Thank you, ' + termData.name + '.';
+          out3.appendChild(ok);
+          var sub = document.createElement('div');
+          sub.style.color = 'rgba(0,255,65,.45)';
+          sub.textContent = 'Your report helps improve PeerCortex.';
+          out3.appendChild(sub);
+          out3.scrollTop = out3.scrollHeight;
+        })();
+        termPrint('');
+        termPrint('Type <span style="' + G + '">send</span> for another report.');
+      } else {
+        (function(){
+          var out4 = document.getElementById('termOutput');
+          var er   = document.createElement('div');
+          er.style.color = 'rgba(255,100,100,.8)';
+          er.textContent = 'Error: ' + (d.error || 'unknown');
+          out4.appendChild(er); out4.scrollTop = out4.scrollHeight;
+        })();
+      }
+    }).catch(function(){
+      (function(){
+        var out5 = document.getElementById('termOutput');
+        var ne   = document.createElement('div');
+        ne.style.color = 'rgba(255,100,100,.8)';
+        ne.textContent = 'Network error — please try again.';
+        out5.appendChild(ne); out5.scrollTop = out5.scrollHeight;
+      })();
+    });
+  }
+}
 </script>
+
+<!-- ─── Terminal Feedback Trigger Button ────────────────────────────── -->
+<button id="termBtn" onclick="toggleTerm()" title="Feedback Terminal"
+  onmouseover="this.style.borderColor='rgba(0,255,65,.7)';this.style.boxShadow='0 4px 24px rgba(0,0,0,.5),0 0 32px rgba(0,255,65,.2)'"
+  onmouseout="this.style.borderColor='rgba(0,255,65,.35)';this.style.boxShadow='0 4px 20px rgba(0,0,0,.4),0 0 20px rgba(0,255,65,.07)'"
+  style="position:fixed;bottom:24px;right:24px;width:52px;height:52px;background:rgba(10,10,10,.88);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:1px solid rgba(0,255,65,.35);border-radius:6px;color:#00ff41;font-family:'IBM Plex Mono','Courier New',monospace;font-size:.82rem;font-weight:600;letter-spacing:.04em;cursor:pointer;z-index:9999;display:flex;align-items:center;justify-content:center;transition:border-color .2s,box-shadow .2s;box-shadow:0 4px 20px rgba(0,0,0,.4),0 0 20px rgba(0,255,65,.07)">$_</button>
+
+<!-- ─── Terminal Feedback Panel ─────────────────────────────────────── -->
+<div id="termPanel"
+  style="display:none;position:fixed;bottom:86px;right:24px;width:500px;background:rgba(10,10,10,.88);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border:1px solid rgba(0,255,65,.22);border-radius:8px;box-shadow:0 24px 64px rgba(0,0,0,.6),0 0 40px rgba(0,255,65,.05);font-family:'IBM Plex Mono','Courier New',monospace;font-size:.78rem;z-index:10000;flex-direction:column;overflow:hidden">
+  <!-- Title bar -->
+  <div style="background:rgba(0,0,0,.5);padding:.45rem .8rem;display:flex;align-items:center;gap:.45rem;border-bottom:1px solid rgba(0,255,65,.1);flex-shrink:0">
+    <span onclick="closeTerm()" style="width:11px;height:11px;border-radius:50%;background:#ff5f56;display:inline-block;cursor:pointer;flex-shrink:0"></span>
+    <span style="width:11px;height:11px;border-radius:50%;background:#ffbd2e;display:inline-block;flex-shrink:0"></span>
+    <span style="width:11px;height:11px;border-radius:50%;background:#27c93f;display:inline-block;flex-shrink:0"></span>
+    <span style="flex:1;text-align:center;color:rgba(0,255,65,.45);font-size:.63rem;letter-spacing:.09em">peercortex-feedback — bash</span>
+  </div>
+  <!-- Output area -->
+  <div id="termOutput" style="flex:1;overflow-y:auto;padding:.8rem;color:#00ff41;line-height:1.75;min-height:250px;max-height:340px;word-break:break-word"></div>
+  <!-- Input line -->
+  <div style="display:flex;align-items:center;padding:.45rem .8rem;border-top:1px solid rgba(0,255,65,.1);gap:.5rem;flex-shrink:0">
+    <span id="termPrompt" style="color:rgba(0,255,65,.55);white-space:nowrap;flex-shrink:0">peercortex:~$</span>
+    <input id="termInput" type="text" autocomplete="off" spellcheck="false" onkeydown="termKeydown(event)"
+      style="flex:1;background:transparent;border:none;outline:none;color:#00ff41;font-family:'IBM Plex Mono','Courier New',monospace;font-size:.78rem;caret-color:#00ff41">
+  </div>
+</div>
 
 </body>
 </html>
