@@ -85,6 +85,10 @@ const CACHE_TTL_NEWS = 10 * 60 * 1000;    // 10 minutes
 const CACHE_TTL_DEFAULT = 5 * 60 * 1000;  // 5 minutes
 
 // ============================================================
+// Infrastructure overlay caches
+let subCableCache = null;      // TeleGeography submarine cables (24h)
+let globalFacCache = null;     // PeeringDB global facilities (24h)
+
 // RPKI ASPA + ROA Cache from Cloudflare RPKI JSON feed
 // ============================================================
 const rpkiAspaMap = new Map(); // customer_asid -> Set<provider_asn>
@@ -2844,6 +2848,54 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(500);
       return res.end(JSON.stringify({ error: "WHOIS lookup failed", message: err.message }));
     }
+  }
+
+  // Feature 28: Submarine Cable overlay (TeleGeography proxy)
+  if (reqPath === "/api/submarine-cables") {
+    const CABLE_TTL = 24 * 60 * 60 * 1000;
+    if (subCableCache && Date.now() - subCableCache.ts < CABLE_TTL) {
+      res.setHeader("Content-Type", "application/json");
+      res.setHeader("Access-Control-Allow-Origin", "*");
+      res.setHeader("Cache-Control", "public, max-age=86400");
+      return res.end(subCableCache.data);
+    }
+    const cableData = await fetchJSONWithRetry("https://www.submarinecablemap.com/api/v3/cable/cable-geo.json", { timeout: 30000 });
+    if (cableData) {
+      subCableCache = { ts: Date.now(), data: JSON.stringify(cableData) };
+      res.setHeader("Content-Type", "application/json");
+      res.setHeader("Access-Control-Allow-Origin", "*");
+      res.setHeader("Cache-Control", "public, max-age=86400");
+      return res.end(subCableCache.data);
+    }
+    res.writeHead(503);
+    return res.end(JSON.stringify({ error: "Submarine cable data unavailable" }));
+  }
+
+  // Feature 29: Global datacenter/IXP map (PeeringDB proxy)
+  if (reqPath === "/api/global-infra") {
+    const FAC_TTL = 24 * 60 * 60 * 1000;
+    if (globalFacCache && Date.now() - globalFacCache.ts < FAC_TTL) {
+      res.setHeader("Content-Type", "application/json");
+      res.setHeader("Access-Control-Allow-Origin", "*");
+      res.setHeader("Cache-Control", "public, max-age=86400");
+      return res.end(globalFacCache.data);
+    }
+    const [facData, ixData] = await Promise.all([
+      fetchJSONWithRetry(PEERINGDB_API_URL + "/fac?depth=1&limit=3000", { timeout: 30000 }),
+      fetchJSONWithRetry(PEERINGDB_API_URL + "/ix?depth=1&limit=1000", { timeout: 30000 }),
+    ]);
+    const facs = (facData && facData.data || [])
+      .filter(f => f.latitude && f.longitude)
+      .map(f => ({ id: f.id, name: f.name, city: f.city, country: f.country, lat: +f.latitude, lng: +f.longitude }));
+    const ixps = (ixData && ixData.data || [])
+      .filter(ix => ix.city && ix.country)
+      .map(ix => ({ id: ix.id, name: ix.name, city: ix.city, country: ix.country, website: ix.website }));
+    const result = JSON.stringify({ facs, ixps });
+    globalFacCache = { ts: Date.now(), data: result };
+    res.setHeader("Content-Type", "application/json");
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Cache-Control", "public, max-age=86400");
+    return res.end(result);
   }
 
   // 404

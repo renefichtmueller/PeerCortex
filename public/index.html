@@ -7,8 +7,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" />
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 :root{
@@ -263,6 +263,10 @@ a{color:var(--blue);text-decoration:none;transition:color .2s}a:hover{color:var(
 .prefix-badge{font-size:.7rem;padding:.2rem .5rem;border-radius:4px;background:var(--bg);border:1px solid var(--border);color:var(--text-dim);font-family:'Inter',monospace}
 .routing-footer{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.75rem;margin-top:1rem;padding-top:.75rem;border-top:1px solid var(--border)}
 .routing-footer-left{display:flex;align-items:center;gap:.5rem;font-size:.8rem;color:var(--text-dim)}
+.pc-popup .maplibregl-popup-content{background:#1a1b26;border:1px solid #2a2b3d;border-radius:6px;padding:8px 10px;color:#e2e8f0;font-family:Inter,sans-serif;font-size:12px;box-shadow:0 4px 16px rgba(0,0,0,.5)}
+.pc-popup .maplibregl-popup-tip{border-top-color:#1a1b26;border-bottom-color:#1a1b26}
+.maplibregl-ctrl-attrib{background:rgba(26,27,38,.7)!important;color:#8892a4!important;font-size:10px!important}
+.maplibregl-ctrl-attrib a{color:#3b82f6!important}
 
 </style>
 </head>
@@ -434,10 +438,25 @@ a{color:var(--blue);text-decoration:none;transition:color .2s}a:hover{color:var(
   <div class="card full" id="mapCard" style="display:none">
     <div class="card-title" style="cursor:pointer" onclick="toggleExpand(this)">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="10" r="3"/><path d="M12 21.7C17.3 17 20 13 20 10a8 8 0 10-16 0c0 3 2.7 7 8 11.7z"/></svg>
-      Network Footprint Map
+      Global Infrastructure Map
     </div>
     <div class="expand-body">
-      <div id="networkMap" style="height:450px;border-radius:8px;background:#1a1b26"></div>
+      <!-- Layer toggle bar -->
+      <div id="mapLayerBar" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;align-items:center">
+        <span style="font-size:.7rem;color:var(--muted);margin-right:2px;text-transform:uppercase;letter-spacing:.05em">Layers:</span>
+        <button class="map-layer-btn active" id="layerBtnPops" onclick="toggleMapLayer('pops',this)" style="padding:3px 10px;font-size:.72rem;border-radius:4px;border:1px solid #7dcfff;color:#7dcfff;background:rgba(125,207,255,.12);cursor:pointer">&#9679; ASN PoPs</button>
+        <button class="map-layer-btn" id="layerBtnCables" onclick="toggleMapLayer('cables',this)" style="padding:3px 10px;font-size:.72rem;border-radius:4px;border:1px solid #4a5568;color:var(--muted);background:transparent;cursor:pointer">&#9642; Submarine Cables</button>
+        <button class="map-layer-btn" id="layerBtnGlobalFacs" onclick="toggleMapLayer('globalFacs',this)" style="padding:3px 10px;font-size:.72rem;border-radius:4px;border:1px solid #4a5568;color:var(--muted);background:transparent;cursor:pointer">&#9675; Global Datacenters</button>
+        <span id="mapLoadingIndicator" style="font-size:.7rem;color:var(--muted);margin-left:4px;display:none">Loading...</span>
+      </div>
+      <div id="networkMap" style="height:500px;border-radius:8px;background:#1a1b26;position:relative"></div>
+      <!-- Legend -->
+      <div style="display:flex;flex-wrap:wrap;gap:12px;margin-top:8px;font-size:.7rem;color:var(--muted)">
+        <span><span style="color:#ff9e64">&#9679;</span> IXP</span>
+        <span><span style="color:#7dcfff">&#9679;</span> Datacenter/Facility</span>
+        <span><span style="color:#9ece6a">&#9644;</span> Submarine Cable</span>
+        <span><span style="color:#666">&#9675;</span> Global Datacenter (PeeringDB)</span>
+      </div>
     </div>
   </div>
 
@@ -1240,18 +1259,127 @@ function renderDashboard(d) {
 // Note: innerHTML usage above is the existing pattern in this codebase; all user-facing
 // strings are escaped via escHtml/escAttr before insertion.
 
+// ============================================================
+// Global Infrastructure Map (MapLibre GL)
+// Layers: ASN PoPs | Submarine Cables | Global Datacenters
+// ============================================================
 var _pcMap = null;
+var _pcMapData = null;       // current ASN data
+var _mapLayers = { pops: true, cables: false, globalFacs: false };
+var _cablesLoaded = false;
+var _globalFacsLoaded = false;
+
+function toggleMapLayer(layer, btn) {
+  _mapLayers[layer] = !_mapLayers[layer];
+  var active = _mapLayers[layer];
+  btn.style.border = active ? '1px solid ' + _layerColor(layer) : '1px solid #4a5568';
+  btn.style.color = active ? _layerColor(layer) : 'var(--muted)';
+  btn.style.background = active ? 'rgba(' + _layerRgb(layer) + ',.12)' : 'transparent';
+
+  if (!_pcMap) return;
+  if (layer === 'pops') {
+    ['pops-fac', 'pops-ix'].forEach(function(id) {
+      if (_pcMap.getLayer(id)) _pcMap.setLayoutProperty(id, 'visibility', active ? 'visible' : 'none');
+    });
+  } else if (layer === 'cables') {
+    if (active && !_cablesLoaded) { _loadCables(); return; }
+    ['cables-line', 'cables-glow'].forEach(function(id) {
+      if (_pcMap.getLayer(id)) _pcMap.setLayoutProperty(id, 'visibility', active ? 'visible' : 'none');
+    });
+  } else if (layer === 'globalFacs') {
+    if (active && !_globalFacsLoaded) { _loadGlobalFacs(); return; }
+    if (_pcMap.getLayer('global-facs')) _pcMap.setLayoutProperty('global-facs', 'visibility', active ? 'visible' : 'none');
+  }
+}
+
+function _layerColor(l) {
+  return l === 'pops' ? '#7dcfff' : l === 'cables' ? '#9ece6a' : '#bb9af7';
+}
+function _layerRgb(l) {
+  return l === 'pops' ? '125,207,255' : l === 'cables' ? '158,206,106' : '187,154,247';
+}
+
+function _showMapLoader(show) {
+  var el = document.getElementById('mapLoadingIndicator');
+  if (el) el.style.display = show ? 'inline' : 'none';
+}
+
+function _loadCables() {
+  _showMapLoader(true);
+  fetch('/api/submarine-cables').then(function(r) { return r.json(); }).then(function(geo) {
+    if (!_pcMap) return;
+    _cablesLoaded = true;
+    _showMapLoader(false);
+    if (_pcMap.getSource('cables')) return;
+    _pcMap.addSource('cables', { type: 'geojson', data: geo });
+    _pcMap.addLayer({
+      id: 'cables-glow', type: 'line', source: 'cables',
+      layout: { 'line-cap': 'round', visibility: 'visible' },
+      paint: { 'line-color': '#9ece6a', 'line-width': 4, 'line-opacity': 0.08 }
+    }, 'pops-fac');
+    _pcMap.addLayer({
+      id: 'cables-line', type: 'line', source: 'cables',
+      layout: { 'line-cap': 'round', visibility: 'visible' },
+      paint: { 'line-color': '#9ece6a', 'line-width': 1.2, 'line-opacity': 0.55 }
+    }, 'pops-fac');
+    _pcMap.on('click', 'cables-line', function(e) {
+      var props = e.features[0].properties;
+      new maplibregl.Popup({ closeButton: false, className: 'pc-popup' })
+        .setLngLat(e.lngLat)
+        .setHTML('<b style="color:#9ece6a">' + (props.name || 'Submarine Cable') + '</b>' +
+          (props.color ? '<br><span style="color:#8892a4;font-size:11px">Color: ' + props.color + '</span>' : ''))
+        .addTo(_pcMap);
+    });
+    _pcMap.on('mouseenter', 'cables-line', function() { _pcMap.getCanvas().style.cursor = 'pointer'; });
+    _pcMap.on('mouseleave', 'cables-line', function() { _pcMap.getCanvas().style.cursor = ''; });
+  }).catch(function() { _showMapLoader(false); _cablesLoaded = false; });
+}
+
+function _loadGlobalFacs() {
+  _showMapLoader(true);
+  fetch('/api/global-infra').then(function(r) { return r.json(); }).then(function(data) {
+    if (!_pcMap) return;
+    _globalFacsLoaded = true;
+    _showMapLoader(false);
+    if (_pcMap.getSource('global-facs')) return;
+    var features = (data.facs || []).map(function(f) {
+      return { type: 'Feature', geometry: { type: 'Point', coordinates: [f.lng, f.lat] },
+        properties: { name: f.name, city: f.city, country: f.country } };
+    });
+    _pcMap.addSource('global-facs', { type: 'geojson', data: { type: 'FeatureCollection', features: features } });
+    _pcMap.addLayer({
+      id: 'global-facs', type: 'circle', source: 'global-facs',
+      layout: { visibility: 'visible' },
+      paint: { 'circle-radius': 3, 'circle-color': '#bb9af7', 'circle-opacity': 0.5, 'circle-stroke-width': 0.5, 'circle-stroke-color': '#bb9af7' }
+    }, 'pops-fac');
+    _pcMap.on('click', 'global-facs', function(e) {
+      var p = e.features[0].properties;
+      new maplibregl.Popup({ closeButton: false, className: 'pc-popup' })
+        .setLngLat(e.lngLat)
+        .setHTML('<b style="color:#bb9af7">' + p.name + '</b><br><span style="font-size:11px;color:#8892a4">' + (p.city || '') + (p.country ? ', ' + p.country : '') + '</span>')
+        .addTo(_pcMap);
+    });
+    _pcMap.on('mouseenter', 'global-facs', function() { _pcMap.getCanvas().style.cursor = 'pointer'; });
+    _pcMap.on('mouseleave', 'global-facs', function() { _pcMap.getCanvas().style.cursor = ''; });
+  }).catch(function() { _showMapLoader(false); _globalFacsLoaded = false; });
+}
+
 function renderNetworkMap(d) {
   var mapCard = document.getElementById('mapCard');
   var mapDiv = document.getElementById('networkMap');
-  if (!mapCard || !mapDiv || typeof L === 'undefined') return;
+  if (!mapCard || !mapDiv || typeof maplibregl === 'undefined') return;
 
-  // Collect all markers
-  var markers = [];
+  _pcMapData = d;
+
+  // Build ASN PoP GeoJSON
+  var popFeatures = [];
   var facs = (d.facilities && d.facilities.list) || [];
   facs.forEach(function(f) {
     if (f.latitude && f.longitude) {
-      markers.push({ lat: f.latitude, lng: f.longitude, type: 'fac', name: f.name, detail: f.city + (f.country ? ', ' + f.country : '') });
+      popFeatures.push({ type: 'Feature',
+        geometry: { type: 'Point', coordinates: [+f.longitude, +f.latitude] },
+        properties: { type: 'fac', name: f.name, detail: (f.city || '') + (f.country ? ', ' + f.country : '') }
+      });
     }
   });
   var ixLocs = d.ix_locations || [];
@@ -1261,80 +1389,78 @@ function renderNetworkMap(d) {
   ixLocs.forEach(function(ix) {
     if (ix.latitude && ix.longitude) {
       var spd = ixSpeedMap[ix.ix_id] || 0;
-      markers.push({ lat: ix.latitude, lng: ix.longitude, type: 'ix', name: ix.name, detail: (ix.city || '') + (spd ? ' | ' + fmtSpeed(spd) : '') });
+      popFeatures.push({ type: 'Feature',
+        geometry: { type: 'Point', coordinates: [+ix.longitude, +ix.latitude] },
+        properties: { type: 'ix', name: ix.name, detail: (ix.city || '') + (spd ? ' | ' + fmtSpeed(spd) : '') }
+      });
     }
   });
 
-  if (markers.length === 0) { mapCard.style.display = 'none'; return; }
-
-  // KEY FIX: Set display + explicit pixel dimensions BEFORE creating Leaflet map
+  if (popFeatures.length === 0) { mapCard.style.display = 'none'; return; }
   mapCard.style.display = 'block';
-  var cardWidth = mapCard.getBoundingClientRect().width;
-  mapDiv.style.width = (cardWidth - 40) + 'px';
-  mapDiv.style.height = '450px';
 
   // Destroy previous map
-  if (_pcMap) { _pcMap.remove(); _pcMap = null; }
+  if (_pcMap) { _pcMap.remove(); _pcMap = null; _cablesLoaded = false; _globalFacsLoaded = false; }
 
-  // Use setTimeout to let the browser fully lay out the container
   setTimeout(function() {
-    // Re-measure after layout
-    var w = mapDiv.getBoundingClientRect().width;
-    if (w < 100) { mapDiv.style.width = '100%'; }
-
-    _pcMap = L.map(mapDiv, { scrollWheelZoom: false, attributionControl: false });
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-      maxZoom: 18, subdomains: 'abcd'
-    }).addTo(_pcMap);
-    L.control.attribution({ prefix: false }).addAttribution('&copy; <a href="https://carto.com">CARTO</a>').addTo(_pcMap);
-
-    var bounds = L.latLngBounds();
-    markers.forEach(function(m) {
-      var color = m.type === 'fac' ? '#7dcfff' : '#ff9e64';
-      var radius = m.type === 'fac' ? 7 : 6;
-      var circle = L.circleMarker([m.lat, m.lng], {
-        radius: radius, fillColor: color, fillOpacity: 0.85, color: color, weight: 1, opacity: 0.6
-      }).addTo(_pcMap);
-      var popupDiv = document.createElement('div');
-      popupDiv.style.cssText = 'font-family:Inter,sans-serif;font-size:12px';
-      var nameEl = document.createElement('b');
-      nameEl.textContent = m.name;
-      popupDiv.appendChild(nameEl);
-      if (m.detail) {
-        popupDiv.appendChild(document.createElement('br'));
-        var detailEl = document.createElement('span');
-        detailEl.textContent = m.detail;
-        popupDiv.appendChild(detailEl);
-      }
-      circle.bindPopup(popupDiv);
-      bounds.extend([m.lat, m.lng]);
+    _pcMap = new maplibregl.Map({
+      container: 'networkMap',
+      style: 'https://tiles.openfreemap.org/styles/dark',
+      center: [10, 20],
+      zoom: 2,
+      attributionControl: false,
     });
 
-    // Faint lines between facilities in same country
-    var facByCountry = {};
-    facs.forEach(function(f) {
-      if (f.latitude && f.longitude && f.country) {
-        if (!facByCountry[f.country]) facByCountry[f.country] = [];
-        facByCountry[f.country].push([f.latitude, f.longitude]);
-      }
-    });
-    Object.keys(facByCountry).forEach(function(cc) {
-      var pts = facByCountry[cc];
-      if (pts.length >= 2 && pts.length <= 15) {
-        for (var i = 0; i < pts.length - 1; i++) {
-          L.polyline([pts[i], pts[i + 1]], { color: '#bb9af7', weight: 1, opacity: 0.3 }).addTo(_pcMap);
-        }
-      }
-    });
+    _pcMap.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-right');
 
-    if (bounds.isValid()) {
-      _pcMap.fitBounds(bounds, { padding: [30, 30], maxZoom: 6 });
-    }
+    _pcMap.on('load', function() {
+      var popGeo = { type: 'FeatureCollection', features: popFeatures };
 
-    // Final invalidateSize after everything is rendered
-    setTimeout(function() {
-      if (_pcMap) _pcMap.invalidateSize();
-    }, 300);
+      _pcMap.addSource('pops', { type: 'geojson', data: popGeo });
+
+      // Facility circles
+      _pcMap.addLayer({
+        id: 'pops-fac', type: 'circle', source: 'pops',
+        filter: ['==', ['get', 'type'], 'fac'],
+        paint: { 'circle-radius': 7, 'circle-color': '#7dcfff', 'circle-opacity': 0.85, 'circle-stroke-width': 1, 'circle-stroke-color': '#7dcfff', 'circle-stroke-opacity': 0.5 }
+      });
+
+      // IXP circles
+      _pcMap.addLayer({
+        id: 'pops-ix', type: 'circle', source: 'pops',
+        filter: ['==', ['get', 'type'], 'ix'],
+        paint: { 'circle-radius': 6, 'circle-color': '#ff9e64', 'circle-opacity': 0.85, 'circle-stroke-width': 1, 'circle-stroke-color': '#ff9e64', 'circle-stroke-opacity': 0.5 }
+      });
+
+      // Popups for PoPs
+      ['pops-fac', 'pops-ix'].forEach(function(layerId) {
+        _pcMap.on('click', layerId, function(e) {
+          var p = e.features[0].properties;
+          var color = p.type === 'ix' ? '#ff9e64' : '#7dcfff';
+          var label = p.type === 'ix' ? 'IXP' : 'Datacenter';
+          new maplibregl.Popup({ closeButton: false, className: 'pc-popup' })
+            .setLngLat(e.lngLat)
+            .setHTML('<div style="font-family:Inter,sans-serif;font-size:12px;min-width:140px">' +
+              '<span style="font-size:10px;color:' + color + ';text-transform:uppercase;letter-spacing:.05em">' + label + '</span><br>' +
+              '<b style="color:#e2e8f0">' + p.name + '</b>' +
+              (p.detail ? '<br><span style="color:#8892a4;font-size:11px">' + p.detail + '</span>' : '') +
+              '</div>')
+            .addTo(_pcMap);
+        });
+        _pcMap.on('mouseenter', layerId, function() { _pcMap.getCanvas().style.cursor = 'pointer'; });
+        _pcMap.on('mouseleave', layerId, function() { _pcMap.getCanvas().style.cursor = ''; });
+      });
+
+      // Fit to PoP bounds
+      var lngs = popFeatures.map(function(f) { return f.geometry.coordinates[0]; });
+      var lats = popFeatures.map(function(f) { return f.geometry.coordinates[1]; });
+      var bounds = [[Math.min.apply(null,lngs)-2, Math.min.apply(null,lats)-2], [Math.max.apply(null,lngs)+2, Math.max.apply(null,lats)+2]];
+      _pcMap.fitBounds(bounds, { padding: 40, maxZoom: 6, duration: 800 });
+
+      // Restore active overlay layers
+      if (_mapLayers.cables && !_cablesLoaded) _loadCables();
+      if (_mapLayers.globalFacs && !_globalFacsLoaded) _loadGlobalFacs();
+    });
   }, 50);
 }
 
